@@ -4,7 +4,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 const TOKEN = Deno.env.get("BOT_TOKEN")!;
 const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
 const SECRET_PATH = "/tkmracehelper"; // путь для вебхука
-const GAME_CHAT_ID = -1001234567890; // <-- сюда вставь ID чата про игру TkmRace
+const GAME_CHAT_ID = -1001234567890; // <-- вставь ID твоего игрового чата
 
 // --- Утилиты ---
 async function sendMessage(chatId: number, text: string) {
@@ -43,7 +43,7 @@ async function deleteMessage(chatId: number, messageId: number) {
 }
 
 async function muteUser(chatId: number, userId: number) {
-  const untilDate = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24 часа
+  const untilDate = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24ч
   await fetch(`${TELEGRAM_API}/restrictChatMember`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -98,7 +98,7 @@ async function answerCallbackQuery(callbackQueryId: string, text: string, showAl
   });
 }
 
-// --- Автоматические сообщения про игру каждые 60 сек ---
+// --- Авто-сообщения про игру ---
 setInterval(async () => {
   const texts = [
     "🏎 Добро пожаловать в TkmRace! Готов к гонке?",
@@ -118,14 +118,21 @@ serve(async (req: Request) => {
 
   const update = await req.json();
 
-  // Приветствие
+  // Если написали в личку боту
+  if (update.message?.chat?.type === "private") {
+    const chatId = update.message.chat.id;
+    await sendMessage(chatId, "👋 Привет! Я бот группы TkmRace. Работать я могу только в чате игры.");
+    return new Response("ok");
+  }
+
+  // Приветствие новых
   if (update.message?.new_chat_member) {
     const user = update.message.new_chat_member;
     const chatId = update.message.chat.id;
     await sendMessage(chatId, `Добро пожаловать, ${user.first_name}! 🎉`);
   }
 
-  // Уведомление о выходе
+  // Сообщение при выходе
   if (update.message?.left_chat_member) {
     const user = update.message.left_chat_member;
     const chatId = update.message.chat.id;
