@@ -151,8 +151,7 @@ serve(async (req: Request) => {
         await unmuteUser(chatId, targetId);
         await sendMessage(chatId, `✅ Предупреждения пользователя сняты админом.`);
       } else {
-        // вместо сообщения в чат — всплывашка
-    await answerCallbackQuery(update.callback_query.id, "⛔ Только админ может убирать предупреждения", true);
+        await sendMessage(chatId, `⛔ Только админ может убирать предупреждения.`);
       }
     }
   }
