@@ -8,10 +8,27 @@ const SECRET_PATH = "/tkmracehelper"; // путь для вебхука
 // Хранилище предупреждений (в памяти)
 const warnings = new Map<number, number>();
 
-// username → userId (будем сохранять, чтобы потом искать)
-const usernames = new Map<string, number>();
+// Функция отправки сообщений с кнопкой
+async function sendWarning(chatId: number, text: string, userId: number) {
+  await fetch(`${TELEGRAM_API}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      reply_markup: {
+        inline_keyboard: [[
+          {
+            text: "❌ Убрать предупреждение",
+            callback_data: `remove_warning_${userId}`
+          }
+        ]]
+      }
+    }),
+  });
+}
 
-// Функция отправки сообщений
+// Простое сообщение
 async function sendMessage(chatId: number, text: string) {
   await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: "POST",
@@ -29,7 +46,7 @@ async function deleteMessage(chatId: number, messageId: number) {
   });
 }
 
-// Мут пользователя (запретить писать сообщения)
+// Мут пользователя
 async function muteUser(chatId: number, userId: number) {
   await fetch(`${TELEGRAM_API}/restrictChatMember`, {
     method: "POST",
@@ -47,7 +64,7 @@ async function muteUser(chatId: number, userId: number) {
   });
 }
 
-// Размут пользователя
+// Размут пользователя (восстановление прав)
 async function unmuteUser(chatId: number, userId: number) {
   await fetch(`${TELEGRAM_API}/restrictChatMember`, {
     method: "POST",
@@ -65,6 +82,15 @@ async function unmuteUser(chatId: number, userId: number) {
   });
 }
 
+// Проверка — является ли пользователь админом
+async function isAdmin(chatId: number, userId: number) {
+  const res = await fetch(`${TELEGRAM_API}/getChatMember?chat_id=${chatId}&user_id=${userId}`);
+  const data = await res.json();
+  if (!data.ok) return false;
+  const status = data.result.status;
+  return status === "administrator" || status === "creator";
+}
+
 serve(async (req: Request) => {
   if (new URL(req.url).pathname !== SECRET_PATH) {
     return new Response("Not Found", { status: 404 });
@@ -72,51 +98,23 @@ serve(async (req: Request) => {
 
   const update = await req.json();
 
-  // Приветствие нового участника
+  // Приветствие
   if (update.message?.new_chat_member) {
     const user = update.message.new_chat_member;
     const chatId = update.message.chat.id;
-
-    if (user.username) {
-      usernames.set(user.username.toLowerCase(), user.id);
-    }
-
     await sendMessage(chatId, `Добро пожаловать, ${user.first_name}! 🎉`);
   }
 
-  // Проверка сообщений
+  // Проверка на текстовые сообщения
   if (update.message?.text) {
     const chatId = update.message.chat.id;
     const userId = update.message.from.id;
     const userName = update.message.from.first_name;
-    const userUsername = update.message.from.username?.toLowerCase();
     const messageId = update.message.message_id;
     const text = update.message.text;
 
-    // Сохраняем username → userId
-    if (userUsername) {
-      usernames.set(userUsername, userId);
-    }
-
-    // Проверка на команду unmute
-    if (text.includes("unmute")) {
-      const match = text.match(/@([a-zA-Z0-9_]+)/);
-      if (match) {
-        const targetUsername = match[1].toLowerCase();
-        const targetId = usernames.get(targetUsername);
-
-        if (targetId) {
-          await unmuteUser(chatId, targetId);
-          warnings.delete(targetId);
-          await sendMessage(chatId, `✅ Пользователь @${targetUsername} размучен и его предупреждения обнулены.`);
-        } else {
-          await sendMessage(chatId, `⚠️ Не удалось найти пользователя @${targetUsername}.`);
-        }
-      }
-    }
-
-    // Проверка сообщений на ссылки (спам)
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
+
     if (linkRegex.test(text)) {
       await deleteMessage(chatId, messageId);
 
@@ -125,7 +123,11 @@ serve(async (req: Request) => {
       warnings.set(userId, count);
 
       if (count < 4) {
-        await sendMessage(chatId, `⚠️ ${userName}, это спам! У вас ${count}/3 предупреждений.`);
+        await sendWarning(
+          chatId,
+          `⚠️ ${userName}, это спам! У вас ${count}/3 предупреждений.`,
+          userId
+        );
       } else {
         await sendMessage(chatId, `🤐 ${userName} больше не может писать сообщения (мут за спам).`);
         await muteUser(chatId, userId);
@@ -134,6 +136,25 @@ serve(async (req: Request) => {
     }
   }
 
+  // Обработка нажатия кнопки "Убрать предупреждение"
+  if (update.callback_query) {
+    const chatId = update.callback_query.message.chat.id;
+    const fromId = update.callback_query.from.id;
+    const data = update.callback_query.data;
+
+    if (data.startsWith("remove_warning_")) {
+      const targetId = parseInt(data.replace("remove_warning_", ""));
+
+      // Проверяем, админ ли тот, кто нажал
+      if (await isAdmin(chatId, fromId)) {
+        warnings.delete(targetId);
+        await unmuteUser(chatId, targetId);
+        await sendMessage(chatId, `✅ Предупреждения пользователя сняты админом.`);
+      } else {
+        await sendMessage(chatId, `⛔ Только админ может убирать предупреждения.`);
+      }
+    }
+  }
+
   return new Response("ok");
 });
-
