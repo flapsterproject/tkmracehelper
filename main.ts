@@ -4,7 +4,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 const TOKEN = Deno.env.get("BOT_TOKEN")!;
 const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
 const SECRET_PATH = "/tkmracehelper"; 
-const GAME_CHAT_ID = -1001234567890; // <-- ID группы, куда слать сообщения
+const GAME_CHAT_ID = -1001234567890; // <-- вставь ID твоего игрового чата
 
 // --- Утилиты ---
 async function sendMessage(chatId: number, text: string) {
@@ -106,28 +106,41 @@ serve(async (req: Request) => {
 
   const update = await req.json();
 
-  // ЛС
+  // --- Обработка постов из канала ---
+  if (update.channel_post) {
+    const post = update.channel_post;
+    const texts = [
+      "🏎 Не пропусти новость TkmRace!",
+      "🔥 Смотри новый пост и участвуй в гонке!",
+      "⚡ Проверь свежие обновления TkmRace!",
+      "🎮 TkmRace ждёт тебя: скорость, драйв и адреналин!"
+    ];
+    const randomText = texts[Math.floor(Math.random() * texts.length)];
+    await sendMessage(GAME_CHAT_ID, randomText);
+  }
+
+  // --- Личка ---
   if (update.message?.chat?.type === "private") {
     const chatId = update.message.chat.id;
     await sendMessage(chatId, "👋 Привет! Я бот группы TkmRace. Работать я могу только в чате игры.");
     return new Response("ok");
   }
 
-  // Приветствие новых
+  // --- Приветствие новых ---
   if (update.message?.new_chat_member) {
     const user = update.message.new_chat_member;
     const chatId = update.message.chat.id;
     await sendMessage(chatId, `Добро пожаловать, ${user.first_name}! 🎉`);
   }
 
-  // Выход пользователя
+  // --- Сообщение при выходе ---
   if (update.message?.left_chat_member) {
     const user = update.message.left_chat_member;
     const chatId = update.message.chat.id;
     await sendMessage(chatId, `👋 ${user.first_name} покинул чат.`);
   }
 
-  // Проверка сообщений
+  // --- Проверка на текстовые сообщения ---
   if (update.message?.text) {
     const chatId = update.message.chat.id;
     const userId = update.message.from.id;
@@ -138,16 +151,14 @@ serve(async (req: Request) => {
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
 
     if (linkRegex.test(text)) {
-      if (await isAdmin(chatId, userId)) {
-        return new Response("ok"); // админ → игнор
-      }
+      if (await isAdmin(chatId, userId)) return new Response("ok"); // админ → ничего не делаем
       await deleteMessage(chatId, messageId);
       await muteUser(chatId, userId);
       await sendMuteMessage(chatId, `🤐 ${userName} получил мут на 24 часа за спам.`, userId);
     }
   }
 
-  // Обработка кнопки "Снять мут"
+  // --- Обработка кнопки "Снять мут" ---
   if (update.callback_query) {
     const chatId = update.callback_query.message.chat.id;
     const fromId = update.callback_query.from.id;
@@ -163,18 +174,6 @@ serve(async (req: Request) => {
         await answerCallbackQuery(update.callback_query.id, "⛔ Только админ может снимать мут", false);
       }
     }
-  }
-
-  // Новый пост в канале → шлем сообщение в группу
-  if (update.channel_post) {
-    const texts = [
-      "🏎 Добро пожаловать в TkmRace! Готов к гонке?",
-      "🔥 В TkmRace только самые быстрые становятся чемпионами!",
-      "⚡ Улучши свою реакцию — участвуй в TkmRace прямо сейчас!",
-      "🎮 TkmRace ждёт тебя: скорость, драйв и адреналин!",
-    ];
-    const randomText = texts[Math.floor(Math.random() * texts.length)];
-    await sendMessage(GAME_CHAT_ID, randomText);
   }
 
   return new Response("ok");
