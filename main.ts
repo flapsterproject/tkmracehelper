@@ -4,9 +4,9 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 const TOKEN = Deno.env.get("BOT_TOKEN")!;
 const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
 const SECRET_PATH = "/tkmracehelper"; // путь для вебхука
+const GAME_CHAT_ID = -1001234567890; // <-- сюда вставь ID чата про игру TkmRace
 
 // --- Утилиты ---
-// Отправка обычного сообщения
 async function sendMessage(chatId: number, text: string) {
   await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: "POST",
@@ -15,7 +15,6 @@ async function sendMessage(chatId: number, text: string) {
   });
 }
 
-// Сообщение с кнопкой "Снять мут"
 async function sendMuteMessage(chatId: number, text: string, userId: number) {
   await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: "POST",
@@ -35,7 +34,6 @@ async function sendMuteMessage(chatId: number, text: string, userId: number) {
   });
 }
 
-// Удаление сообщений
 async function deleteMessage(chatId: number, messageId: number) {
   await fetch(`${TELEGRAM_API}/deleteMessage`, {
     method: "POST",
@@ -44,9 +42,8 @@ async function deleteMessage(chatId: number, messageId: number) {
   });
 }
 
-// Мут на 24 часа
 async function muteUser(chatId: number, userId: number) {
-  const untilDate = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24ч
+  const untilDate = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24 часа
   await fetch(`${TELEGRAM_API}/restrictChatMember`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -64,7 +61,6 @@ async function muteUser(chatId: number, userId: number) {
   });
 }
 
-// Размут
 async function unmuteUser(chatId: number, userId: number) {
   await fetch(`${TELEGRAM_API}/restrictChatMember`, {
     method: "POST",
@@ -82,7 +78,6 @@ async function unmuteUser(chatId: number, userId: number) {
   });
 }
 
-// Проверка — админ ли
 async function isAdmin(chatId: number, userId: number) {
   const res = await fetch(`${TELEGRAM_API}/getChatMember?chat_id=${chatId}&user_id=${userId}`);
   const data = await res.json();
@@ -91,7 +86,6 @@ async function isAdmin(chatId: number, userId: number) {
   return status === "administrator" || status === "creator";
 }
 
-// Всплывающее уведомление (answerCallbackQuery)
 async function answerCallbackQuery(callbackQueryId: string, text: string, showAlert = false) {
   await fetch(`${TELEGRAM_API}/answerCallbackQuery`, {
     method: "POST",
@@ -103,6 +97,18 @@ async function answerCallbackQuery(callbackQueryId: string, text: string, showAl
     }),
   });
 }
+
+// --- Автоматические сообщения про игру каждые 60 сек ---
+setInterval(async () => {
+  const texts = [
+    "🏎 Добро пожаловать в TkmRace! Готов к гонке?",
+    "🔥 В TkmRace только самые быстрые становятся чемпионами!",
+    "⚡ Улучши свою реакцию — участвуй в TkmRace прямо сейчас!",
+    "🎮 TkmRace ждёт тебя: скорость, драйв и адреналин!",
+  ];
+  const randomText = texts[Math.floor(Math.random() * texts.length)];
+  await sendMessage(GAME_CHAT_ID, randomText);
+}, 60 * 1000);
 
 // --- Сервер ---
 serve(async (req: Request) => {
@@ -138,8 +144,6 @@ serve(async (req: Request) => {
 
     if (linkRegex.test(text)) {
       await deleteMessage(chatId, messageId);
-
-      // Сразу мутим на 24 часа
       await muteUser(chatId, userId);
       await sendMuteMessage(
         chatId,
@@ -163,7 +167,6 @@ serve(async (req: Request) => {
         await sendMessage(chatId, `🔓 Мут пользователя снят админом.`);
         await answerCallbackQuery(update.callback_query.id, "✅ Мут снят");
       } else {
-        // маленькая всплывашка вместо сообщения в чат
         await answerCallbackQuery(update.callback_query.id, "⛔ Только админ может снимать мут", false);
       }
     }
@@ -171,4 +174,5 @@ serve(async (req: Request) => {
 
   return new Response("ok");
 });
+
 
