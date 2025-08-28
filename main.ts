@@ -4,16 +4,14 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 const TOKEN = Deno.env.get("BOT_TOKEN")!;
 const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
 const SECRET_PATH = "/tkmracehelper"; 
-const GAME_CHAT_ID = -1001234567890; // <-- ID твоего игрового чата
+const GAME_CHAT_ID = -1001234567890; // <-- вставь ID твоего игрового чата
 
 // --- Утилиты ---
-async function sendMessage(chatId: number, text: string, replyTo?: number) {
-  const body: any = { chat_id: chatId, text };
-  if (replyTo) body.reply_to_message_id = replyTo;
+async function sendMessage(chatId: number, text: string) {
   await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ chat_id: chatId, text }),
   });
 }
 
@@ -100,6 +98,18 @@ async function answerCallbackQuery(callbackQueryId: string, text: string, showAl
   });
 }
 
+// --- Авто-сообщения про игру ---
+setInterval(async () => {
+  const texts = [
+    "🏎 Добро пожаловать в TkmRace! Готов к гонке?",
+    "🔥 В TkmRace только самые быстрые становятся чемпионами!",
+    "⚡ Улучши свою реакцию — участвуй в TkmRace прямо сейчас!",
+    "🎮 TkmRace ждёт тебя: скорость, драйв и адреналин!",
+  ];
+  const randomText = texts[Math.floor(Math.random() * texts.length)];
+  await sendMessage(GAME_CHAT_ID, randomText);
+}, 60 * 1000);
+
 // --- Сервер ---
 serve(async (req: Request) => {
   if (new URL(req.url).pathname !== SECRET_PATH) {
@@ -108,43 +118,28 @@ serve(async (req: Request) => {
 
   const update = await req.json();
 
-  // --- Ответ на пост из канала ---
-  if (update.channel_post) {
-    const post = update.channel_post;
-    const texts = [
-      "🏎 Не пропусти новость TkmRace!",
-      "🔥 Смотри новый пост и участвуй в гонке!",
-      "⚡ Проверь свежие обновления TkmRace!",
-      "🎮 TkmRace ждёт тебя: скорость, драйв и адреналин!"
-    ];
-    const randomText = texts[Math.floor(Math.random() * texts.length)];
-
-    // Отправляем reply в чат игры к этому посту
-    await sendMessage(GAME_CHAT_ID, randomText, post.message_id);
-  }
-
-  // --- Личка ---
+  // Личка
   if (update.message?.chat?.type === "private") {
     const chatId = update.message.chat.id;
     await sendMessage(chatId, "👋 Привет! Я бот группы TkmRace. Работать я могу только в чате игры.");
     return new Response("ok");
   }
 
-  // --- Приветствие новых ---
+  // Приветствие новых
   if (update.message?.new_chat_member) {
     const user = update.message.new_chat_member;
     const chatId = update.message.chat.id;
     await sendMessage(chatId, `Добро пожаловать, ${user.first_name}! 🎉`);
   }
 
-  // --- Сообщение при выходе ---
+  // Сообщение при выходе
   if (update.message?.left_chat_member) {
     const user = update.message.left_chat_member;
     const chatId = update.message.chat.id;
     await sendMessage(chatId, `👋 ${user.first_name} покинул чат.`);
   }
 
-  // --- Проверка на текстовые сообщения ---
+  // Проверка на текстовые сообщения
   if (update.message?.text) {
     const chatId = update.message.chat.id;
     const userId = update.message.from.id;
@@ -155,14 +150,24 @@ serve(async (req: Request) => {
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
 
     if (linkRegex.test(text)) {
-      if (await isAdmin(chatId, userId)) return new Response("ok"); // админ → ничего не делаем
+      // Проверяем админа
+      if (await isAdmin(chatId, userId)) {
+        // ⚠️ Админ → ничего не делаем
+        return new Response("ok");
+      }
+
+      // Обычный пользователь → удаляем и мутим
       await deleteMessage(chatId, messageId);
       await muteUser(chatId, userId);
-      await sendMuteMessage(chatId, `🤐 ${userName} получил мут на 24 часа за спам.`, userId);
+      await sendMuteMessage(
+        chatId,
+        `🤐 ${userName} получил мут на 24 часа за спам.`,
+        userId
+      );
     }
   }
 
-  // --- Обработка кнопки "Снять мут" ---
+  // Обработка кнопки "Снять мут"
   if (update.callback_query) {
     const chatId = update.callback_query.message.chat.id;
     const fromId = update.callback_query.from.id;
@@ -170,6 +175,7 @@ serve(async (req: Request) => {
 
     if (data.startsWith("remove_mute_")) {
       const targetId = parseInt(data.replace("remove_mute_", ""));
+
       if (await isAdmin(chatId, fromId)) {
         await unmuteUser(chatId, targetId);
         await sendMessage(chatId, `🔓 Мут пользователя снят админом.`);
@@ -182,6 +188,5 @@ serve(async (req: Request) => {
 
   return new Response("ok");
 });
-
 
 
