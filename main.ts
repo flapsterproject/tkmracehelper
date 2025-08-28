@@ -4,14 +4,16 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 const TOKEN = Deno.env.get("BOT_TOKEN")!;
 const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
 const SECRET_PATH = "/tkmracehelper"; 
-const GAME_CHAT_ID = -1001234567890; // <-- вставь ID твоего игрового чата
+const GAME_CHAT_ID = -1001234567890; // <-- ID твоего игрового чата
 
 // --- Утилиты ---
-async function sendMessage(chatId: number, text: string) {
+async function sendMessage(chatId: number, text: string, replyTo?: number) {
+  const body: any = { chat_id: chatId, text };
+  if (replyTo) body.reply_to_message_id = replyTo;
   await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -106,7 +108,7 @@ serve(async (req: Request) => {
 
   const update = await req.json();
 
-  // --- Обработка постов из канала ---
+  // --- Ответ на пост из канала ---
   if (update.channel_post) {
     const post = update.channel_post;
     const texts = [
@@ -116,7 +118,9 @@ serve(async (req: Request) => {
       "🎮 TkmRace ждёт тебя: скорость, драйв и адреналин!"
     ];
     const randomText = texts[Math.floor(Math.random() * texts.length)];
-    await sendMessage(GAME_CHAT_ID, randomText);
+
+    // Отправляем reply в чат игры к этому посту
+    await sendMessage(GAME_CHAT_ID, randomText, post.message_id);
   }
 
   // --- Личка ---
