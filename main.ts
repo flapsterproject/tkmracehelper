@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 const TOKEN = Deno.env.get("BOT_TOKEN")!;
 const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
-const SECRET_PATH = "/tkmracehelper"; // путь для вебхука
+const SECRET_PATH = "/tkmracehelper"; 
 const GAME_CHAT_ID = -1001234567890; // <-- вставь ID твоего игрового чата
 
 // --- Утилиты ---
@@ -118,7 +118,7 @@ serve(async (req: Request) => {
 
   const update = await req.json();
 
-  // Если написали в личку боту
+  // Личка
   if (update.message?.chat?.type === "private") {
     const chatId = update.message.chat.id;
     await sendMessage(chatId, "👋 Привет! Я бот группы TkmRace. Работать я могу только в чате игры.");
@@ -150,6 +150,13 @@ serve(async (req: Request) => {
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
 
     if (linkRegex.test(text)) {
+      // Проверяем админа
+      if (await isAdmin(chatId, userId)) {
+        // ⚠️ Админ → ничего не делаем
+        return new Response("ok");
+      }
+
+      // Обычный пользователь → удаляем и мутим
       await deleteMessage(chatId, messageId);
       await muteUser(chatId, userId);
       await sendMuteMessage(
