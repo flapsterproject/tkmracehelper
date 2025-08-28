@@ -5,11 +5,18 @@ const TOKEN = Deno.env.get("BOT_TOKEN")!;
 const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
 const SECRET_PATH = "/tkmracehelper"; // путь для вебхука
 
-// Хранилище предупреждений (в памяти)
-const warnings = new Map<number, number>();
+// --- Утилиты ---
+// Отправка обычного сообщения
+async function sendMessage(chatId: number, text: string) {
+  await fetch(`${TELEGRAM_API}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, text }),
+  });
+}
 
-// Функция отправки сообщений с кнопкой
-async function sendWarning(chatId: number, text: string, userId: number) {
+// Сообщение с кнопкой "Снять мут"
+async function sendMuteMessage(chatId: number, text: string, userId: number) {
   await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -19,21 +26,12 @@ async function sendWarning(chatId: number, text: string, userId: number) {
       reply_markup: {
         inline_keyboard: [[
           {
-            text: "❌ Убрать предупреждение",
-            callback_data: `remove_warning_${userId}`
+            text: "🔓 Снять мут",
+            callback_data: `remove_mute_${userId}`
           }
         ]]
       }
     }),
-  });
-}
-
-// Простое сообщение
-async function sendMessage(chatId: number, text: string) {
-  await fetch(`${TELEGRAM_API}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text }),
   });
 }
 
@@ -46,14 +44,16 @@ async function deleteMessage(chatId: number, messageId: number) {
   });
 }
 
-// Мут пользователя
+// Мут на 24 часа
 async function muteUser(chatId: number, userId: number) {
+  const untilDate = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24ч в секундах
   await fetch(`${TELEGRAM_API}/restrictChatMember`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       chat_id: chatId,
       user_id: userId,
+      until_date: untilDate,
       permissions: {
         can_send_messages: false,
         can_send_media_messages: false,
@@ -64,7 +64,7 @@ async function muteUser(chatId: number, userId: number) {
   });
 }
 
-// Размут пользователя (восстановление прав)
+// Размут
 async function unmuteUser(chatId: number, userId: number) {
   await fetch(`${TELEGRAM_API}/restrictChatMember`, {
     method: "POST",
@@ -82,7 +82,7 @@ async function unmuteUser(chatId: number, userId: number) {
   });
 }
 
-// Проверка — является ли пользователь админом
+// Проверка — админ ли
 async function isAdmin(chatId: number, userId: number) {
   const res = await fetch(`${TELEGRAM_API}/getChatMember?chat_id=${chatId}&user_id=${userId}`);
   const data = await res.json();
@@ -91,6 +91,20 @@ async function isAdmin(chatId: number, userId: number) {
   return status === "administrator" || status === "creator";
 }
 
+// Всплывающее уведомление (answerCallbackQuery)
+async function answerCallbackQuery(callbackQueryId: string, text: string, showAlert = false) {
+  await fetch(`${TELEGRAM_API}/answerCallbackQuery`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      callback_query_id: callbackQueryId,
+      text,
+      show_alert: showAlert,
+    }),
+  });
+}
+
+// --- Сервер ---
 serve(async (req: Request) => {
   if (new URL(req.url).pathname !== SECRET_PATH) {
     return new Response("Not Found", { status: 404 });
@@ -118,52 +132,35 @@ serve(async (req: Request) => {
     if (linkRegex.test(text)) {
       await deleteMessage(chatId, messageId);
 
-      let count = warnings.get(userId) || 0;
-      count++;
-      warnings.set(userId, count);
-
-      if (count < 4) {
-        await sendWarning(
-          chatId,
-          `⚠️ ${userName}, это спам! У вас ${count}/3 предупреждений.`,
-          userId
-        );
-      } else {
-        await sendMessage(chatId, `🤐 ${userName} больше не может писать сообщения (мут за спам).`);
-        await muteUser(chatId, userId);
-        warnings.delete(userId);
-      }
+      // Сразу мутим на 24 часа
+      await muteUser(chatId, userId);
+      await sendMuteMessage(
+        chatId,
+        `🤐 ${userName} получил мут на 24 часа за спам.`,
+        userId
+      );
     }
   }
 
-  // Обработка нажатия кнопки "Убрать предупреждение"
+  // Обработка кнопки "Снять мут"
   if (update.callback_query) {
     const chatId = update.callback_query.message.chat.id;
     const fromId = update.callback_query.from.id;
     const data = update.callback_query.data;
 
-    if (data.startsWith("remove_warning_")) {
-      const targetId = parseInt(data.replace("remove_warning_", ""));
+    if (data.startsWith("remove_mute_")) {
+      const targetId = parseInt(data.replace("remove_mute_", ""));
 
-      // Проверяем, админ ли тот, кто нажал
       if (await isAdmin(chatId, fromId)) {
-        warnings.delete(targetId);
         await unmuteUser(chatId, targetId);
-        await sendMessage(chatId, `✅ Предупреждения пользователя сняты админом.`);
+        await sendMessage(chatId, `🔓 Мут пользователя снят админом.`);
+        await answerCallbackQuery(update.callback_query.id, "✅ Мут снят");
       } else {
-      // Показываем уведомление (как на скрине)
-      await fetch(`${TELEGRAM_API}/answerCallbackQuery`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          callback_query_id: callbackId,
-          text: "⛔ Только админ может убирать предупреждения.",
-          show_alert: true
-        }),
-      });
+        // маленькая всплывашка вместо сообщения в чат
+        await answerCallbackQuery(update.callback_query.id, "⛔ Только админ может снимать мут", false);
+      }
     }
   }
-}
 
   return new Response("ok");
 });
