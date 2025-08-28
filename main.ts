@@ -151,10 +151,19 @@ serve(async (req: Request) => {
         await unmuteUser(chatId, targetId);
         await sendMessage(chatId, `✅ Предупреждения пользователя сняты админом.`);
       } else {
-        await sendMessage(chatId, `⛔ Только админ может убирать предупреждения.`);
-      }
+      // Показываем уведомление (как на скрине)
+      await fetch(`${TELEGRAM_API}/answerCallbackQuery`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          callback_query_id: callbackId,
+          text: "⛔ Только админ может убирать предупреждения.",
+          show_alert: true
+        }),
+      });
     }
   }
+}
 
   return new Response("ok");
 });
