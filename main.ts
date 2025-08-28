@@ -46,7 +46,7 @@ async function deleteMessage(chatId: number, messageId: number) {
 
 // Мут на 24 часа
 async function muteUser(chatId: number, userId: number) {
-  const untilDate = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24ч в секундах
+  const untilDate = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24ч
   await fetch(`${TELEGRAM_API}/restrictChatMember`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -119,6 +119,13 @@ serve(async (req: Request) => {
     await sendMessage(chatId, `Добро пожаловать, ${user.first_name}! 🎉`);
   }
 
+  // Уведомление о выходе
+  if (update.message?.left_chat_member) {
+    const user = update.message.left_chat_member;
+    const chatId = update.message.chat.id;
+    await sendMessage(chatId, `👋 ${user.first_name} покинул чат.`);
+  }
+
   // Проверка на текстовые сообщения
   if (update.message?.text) {
     const chatId = update.message.chat.id;
@@ -164,3 +171,4 @@ serve(async (req: Request) => {
 
   return new Response("ok");
 });
+
