@@ -39,8 +39,8 @@ async function deleteMessage(chatId: number, messageId: number) {
   });
 }
 
-async function muteUser(chatId: number, userId: number) {
-  const untilDate = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24ч
+async function muteUser(chatId: number, userId: number, seconds = 24 * 60 * 60) {
+  const untilDate = Math.floor(Date.now() / 1000) + seconds;
   await fetch(`${TELEGRAM_API}/restrictChatMember`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -136,7 +136,7 @@ serve(async (req: Request) => {
     await sendMessage(chatId, `👋 ${user.first_name} покинул чат.`);
   }
 
-  // Проверка на текстовые сообщения
+  // --- Обработка текстовых сообщений ---
   if (update.message?.text) {
     const chatId = update.message.chat.id;
     const userId = update.message.from.id;
@@ -146,65 +146,59 @@ serve(async (req: Request) => {
 
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
     
- // ✅ Команда /mute с указанием времени (только reply от админа)
-if (text.startsWith("/mute") && update.message.reply_to_message) {
-  if (await isAdmin(chatId, userId)) {
-    const targetUser = update.message.reply_to_message.from;
+    // --- Команда /mute с указанием времени (только reply от админа) ---
+    if (text.startsWith("/mute") && update.message.reply_to_message) {
+      if (await isAdmin(chatId, userId)) {
+        const targetUser = update.message.reply_to_message.from;
 
-    // Парсим время из команды: /mute 24h, /mute 1h, /mute 30m
-    const timeMatch = text.match(/\/mute\s+(\d+)([hm])/i);
-    let seconds = 24 * 60 * 60; // по умолчанию 24ч
+        // Парсим время из команды: /mute 24h, /mute 1h, /mute 30m
+        const timeMatch = text.match(/\/mute\s+(\d+)([hm])/i);
+        let seconds = 24 * 60 * 60; // по умолчанию 24ч
 
-    if (timeMatch) {
-      const value = parseInt(timeMatch[1]);
-      const unit = timeMatch[2].toLowerCase();
-      if (unit === "h") seconds = value * 60 * 60;
-      else if (unit === "m") seconds = value * 60;
+        if (timeMatch) {
+          const value = parseInt(timeMatch[1]);
+          const unit = timeMatch[2].toLowerCase();
+          if (unit === "h") seconds = value * 60 * 60;
+          else if (unit === "m") seconds = value * 60;
+        }
+
+        await muteUser(chatId, targetUser.id, seconds);
+
+        await sendMuteMessage(
+          chatId,
+          `🤐 ${targetUser.first_name} получил мут на ${timeMatch ? timeMatch[1] + timeMatch[2] : "24h"}.`,
+          targetUser.id
+        );
+
+        return new Response("ok");
+      } else {
+        return new Response("ok");
+      }
     }
 
-    const untilDate = Math.floor(Date.now() / 1000) + seconds;
-   
-
-    // --- Находим все ссылки и очищаем от пробелов ---
+    // --- Проверка ссылок ---
     const links = (text.match(linkRegex) || []).map(l => l.trim());
-    console.log("Найденные ссылки:", links);
 
-    // ✅ Белый список (разрешаем любые хвосты и параметры)
     const whitelist = [
       /^https?:\/\/t\.me\/Happ_VPN_official(\/.*)?(\?.*)?$/i,
       /^https?:\/\/t\.me\/tmstars_chat(\/.*)?(\?.*)?$/i,
     ];
 
-    // Если нет ссылок → пропускаем
-    if (links.length === 0) return new Response("ok");
-
-    // Проверяем, есть ли запрещённые ссылки
-    let hasBadLink = false;
-    for (const link of links) {
-      if (!whitelist.some(rule => rule.test(link))) {
-        console.log("Запрещённая ссылка:", link);
-        hasBadLink = true;
-        break;
+    if (links.length > 0) {
+      const hasBadLink = !links.every(link => whitelist.some(rule => rule.test(link)));
+      if (hasBadLink && !(await isAdmin(chatId, userId))) {
+        await deleteMessage(chatId, messageId);
+        await muteUser(chatId, userId);
+        await sendMuteMessage(
+          chatId,
+          `🤐 ${userName} получил мут на 24 часа за спам.`,
+          userId
+        );
       }
     }
-
-    // Если все ссылки разрешённые → пропускаем
-    if (!hasBadLink) return new Response("ok");
-
-    // Если админ → пропускаем
-    if (await isAdmin(chatId, userId)) return new Response("ok");
-
-    // Иначе → удаляем и мутим
-    await deleteMessage(chatId, messageId);
-    await muteUser(chatId, userId);
-    await sendMuteMessage(
-      chatId,
-      `🤐 ${userName} получил мут на 24 часа за спам.`,
-      userId
-    );
   }
 
-  // Обработка кнопки "Снять мут"
+  // --- Обработка кнопки "Снять мут" ---
   if (update.callback_query) {
     const chatId = update.callback_query.message.chat.id;
     const fromId = update.callback_query.from.id;
@@ -224,6 +218,7 @@ if (text.startsWith("/mute") && update.message.reply_to_message) {
 
   return new Response("ok");
 });
+
 
 
 
