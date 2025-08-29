@@ -146,17 +146,24 @@ serve(async (req: Request) => {
 
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
     
-     // ✅ Команда /mute (только reply от админа)
-  if (text.startsWith("/mute") && update.message.reply_to_message) {
-    if (await isAdmin(chatId, userId)) {
-      const targetUser = update.message.reply_to_message.from;
-      await muteUser(chatId, targetUser.id);
-      await sendMessage(chatId, `🤐 ${targetUser.first_name} получил мут от админа.`);
-      return new Response("ok");
-    } else {
-      return new Response("ok"); // не админ → игнорируем
+ // ✅ Команда /mute с указанием времени (только reply от админа)
+if (text.startsWith("/mute") && update.message.reply_to_message) {
+  if (await isAdmin(chatId, userId)) {
+    const targetUser = update.message.reply_to_message.from;
+
+    // Парсим время из команды: /mute 24h, /mute 1h, /mute 30m
+    const timeMatch = text.match(/\/mute\s+(\d+)([hm])/i);
+    let seconds = 24 * 60 * 60; // по умолчанию 24ч
+
+    if (timeMatch) {
+      const value = parseInt(timeMatch[1]);
+      const unit = timeMatch[2].toLowerCase();
+      if (unit === "h") seconds = value * 60 * 60;
+      else if (unit === "m") seconds = value * 60;
     }
-  }
+
+    const untilDate = Math.floor(Date.now() / 1000) + seconds;
+   
 
     // --- Находим все ссылки и очищаем от пробелов ---
     const links = (text.match(linkRegex) || []).map(l => l.trim());
