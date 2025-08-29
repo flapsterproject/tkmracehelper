@@ -35,17 +35,17 @@ async function deleteMessage(chatId: number, messageId: number) {
   await fetch(`${TELEGRAM_API}/deleteMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id, message_id: messageId }),
+    body: JSON.stringify({ chat_id: chatId, message_id: messageId }),
   });
 }
 
-async function muteUser(chatId: number, userId: number, seconds = 24*60*60) {
+async function muteUser(chatId: number, userId: number, seconds = 24 * 60 * 60) {
   const untilDate = Math.floor(Date.now() / 1000) + seconds;
   await fetch(`${TELEGRAM_API}/restrictChatMember`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      chat_id,
+      chat_id: chatId,
       user_id: userId,
       until_date: untilDate,
       permissions: {
@@ -63,7 +63,7 @@ async function unmuteUser(chatId: number, userId: number) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      chat_id,
+      chat_id: chatId,
       user_id: userId,
       permissions: {
         can_send_messages: true,
@@ -115,28 +115,28 @@ serve(async (req: Request) => {
 
   const update = await req.json();
 
-  // Личка
+  // --- Личка ---
   if (update.message?.chat?.type === "private") {
     const chatId = update.message.chat.id;
     await sendMessage(chatId, "👋 Привет! Я бот группы TkmRace. Работать я могу только в чате игры.");
     return new Response("ok");
   }
 
-  // Приветствие новых
+  // --- Приветствие новых ---
   if (update.message?.new_chat_member) {
     const user = update.message.new_chat_member;
     const chatId = update.message.chat.id;
     await sendMessage(chatId, `Добро пожаловать, ${user.first_name}! 🎉`);
   }
 
-  // Сообщение при выходе
+  // --- Выход пользователя ---
   if (update.message?.left_chat_member) {
     const user = update.message.left_chat_member;
     const chatId = update.message.chat.id;
     await sendMessage(chatId, `👋 ${user.first_name} покинул чат.`);
   }
 
-  // --- Проверка текстовых сообщений ---
+  // --- Текстовые сообщения ---
   if (update.message?.text) {
     const chatId = update.message.chat.id;
     const userId = update.message.from.id;
@@ -144,7 +144,9 @@ serve(async (req: Request) => {
     const messageId = update.message.message_id;
     const text = update.message.text;
 
-    // --- Команда /mute с reply, временем и причиной ---
+    const linkRegex = /(https?:\/\/[^\s]+)/gi;
+
+    // --- /mute с временем и причиной (только reply от админа) ---
     if (text.startsWith("/mute") && update.message.reply_to_message) {
       if (await isAdmin(chatId, userId)) {
         const targetUser = update.message.reply_to_message.from;
@@ -157,49 +159,49 @@ serve(async (req: Request) => {
         if (match) {
           const value = parseInt(match[1]);
           const unit = match[2].toLowerCase();
-          if (unit === "h") seconds = value * 60 * 60;
-          else if (unit === "m") seconds = value * 60;
+          seconds = unit === "h" ? value * 3600 : value * 60;
           reason = match[3]?.trim() || "";
         }
 
         await muteUser(chatId, targetUser.id, seconds);
 
+        const timeText = match ? `${match[1]}${match[2]}` : "24h";
         const reasonText = reason ? `Причина: ${reason}` : "";
         await sendMuteMessage(
           chatId,
-          `🤐 ${targetUser.first_name} получил мут на ${match ? match[1] + match[2] : "24h"}. ${reasonText}`,
+          `🤐 ${targetUser.first_name} получил мут на ${timeText}. ${reasonText}`,
           targetUser.id
         );
 
+        // Удаляем команду
+        await deleteMessage(chatId, messageId);
+
         return new Response("ok");
-      } else {
-        return new Response("ok"); // не админ → игнорируем
-      }
+      } else return new Response("ok");
     }
 
-    // --- Обработка ссылок ---
-    const linkRegex = /(https?:\/\/[^\s]+)/gi;
+    // --- Проверка ссылок ---
     const links = (text.match(linkRegex) || []).map(l => l.trim());
-
     const whitelist = [
       /^https?:\/\/t\.me\/Happ_VPN_official(\/.*)?(\?.*)?$/i,
       /^https?:\/\/t\.me\/tmstars_chat(\/.*)?(\?.*)?$/i,
     ];
 
-    // Если ссылки есть, проверяем на запрещённые
-    let hasBadLink = links.some(link => !whitelist.some(rule => rule.test(link)));
-    if (hasBadLink && !(await isAdmin(chatId, userId))) {
-      await deleteMessage(chatId, messageId);
-      await muteUser(chatId, userId);
-      await sendMuteMessage(
-        chatId,
-        `🤐 ${userName} получил мут на 24 часа за спам.`,
-        userId
-      );
+    if (links.length > 0) {
+      const hasBadLink = !links.every(link => whitelist.some(rule => rule.test(link)));
+      if (hasBadLink && !(await isAdmin(chatId, userId))) {
+        await deleteMessage(chatId, messageId);
+        await muteUser(chatId, userId);
+        await sendMuteMessage(
+          chatId,
+          `🤐 ${userName} получил мут на 24 часа за спам.`,
+          userId
+        );
+      }
     }
   }
 
-  // --- Обработка кнопки "Снять мут" ---
+  // --- Кнопка "Снять мут" ---
   if (update.callback_query) {
     const chatId = update.callback_query.message.chat.id;
     const fromId = update.callback_query.from.id;
@@ -219,6 +221,7 @@ serve(async (req: Request) => {
 
   return new Response("ok");
 });
+
 
 
 
