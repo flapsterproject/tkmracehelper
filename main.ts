@@ -24,10 +24,7 @@ async function sendMuteMessage(chatId: number, text: string, userId: number) {
       text,
       reply_markup: {
         inline_keyboard: [[
-          {
-            text: "🔓 Снять мут",
-            callback_data: `remove_mute_${userId}`
-          }
+          { text: "🔓 Снять мут", callback_data: `remove_mute_${userId}` }
         ]]
       }
     }),
@@ -149,22 +146,43 @@ serve(async (req: Request) => {
 
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
 
-    if (linkRegex.test(text)) {
-      // Проверяем админа
-      if (await isAdmin(chatId, userId)) {
-        // ⚠️ Админ → ничего не делаем
-        return new Response("ok");
-      }
+    // --- Находим все ссылки и очищаем от пробелов ---
+    const links = (text.match(linkRegex) || []).map(l => l.trim());
+    console.log("Найденные ссылки:", links);
 
-      // Обычный пользователь → удаляем и мутим
-      await deleteMessage(chatId, messageId);
-      await muteUser(chatId, userId);
-      await sendMuteMessage(
-        chatId,
-        `🤐 ${userName} получил мут на 24 часа за спам.`,
-        userId
-      );
+    // ✅ Белый список (разрешаем любые хвосты и параметры)
+    const whitelist = [
+      /^https?:\/\/t\.me\/Happ_VPN_official(\/.*)?(\?.*)?$/i,
+      /^https?:\/\/t\.me\/tmstars_chat(\/.*)?(\?.*)?$/i,
+    ];
+
+    // Если нет ссылок → пропускаем
+    if (links.length === 0) return new Response("ok");
+
+    // Проверяем, есть ли запрещённые ссылки
+    let hasBadLink = false;
+    for (const link of links) {
+      if (!whitelist.some(rule => rule.test(link))) {
+        console.log("Запрещённая ссылка:", link);
+        hasBadLink = true;
+        break;
+      }
     }
+
+    // Если все ссылки разрешённые → пропускаем
+    if (!hasBadLink) return new Response("ok");
+
+    // Если админ → пропускаем
+    if (await isAdmin(chatId, userId)) return new Response("ok");
+
+    // Иначе → удаляем и мутим
+    await deleteMessage(chatId, messageId);
+    await muteUser(chatId, userId);
+    await sendMuteMessage(
+      chatId,
+      `🤐 ${userName} получил мут на 24 часа за спам.`,
+      userId
+    );
   }
 
   // Обработка кнопки "Снять мут"
@@ -175,7 +193,6 @@ serve(async (req: Request) => {
 
     if (data.startsWith("remove_mute_")) {
       const targetId = parseInt(data.replace("remove_mute_", ""));
-
       if (await isAdmin(chatId, fromId)) {
         await unmuteUser(chatId, targetId);
         await sendMessage(chatId, `🔓 Мут пользователя снят админом.`);
@@ -188,5 +205,6 @@ serve(async (req: Request) => {
 
   return new Response("ok");
 });
+
 
 
