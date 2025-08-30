@@ -43,7 +43,7 @@ async function sendMuteMessage(chatId: number, text: string, userId: number, use
       parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [[
-          { text: "🔓 Mute aýyrmak", callback_data: `remove_mute_${userId}_${encodeURIComponent(userName)}` }
+          { text: "🔓 Sessizligi aýyrmak", callback_data: `remove_mute_${userId}_${encodeURIComponent(userName)}` }
         ]]
       }
     }),
