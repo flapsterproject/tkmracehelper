@@ -6,17 +6,24 @@ const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
 const SECRET_PATH = "/tkmracehelper"; 
 const GAME_CHAT_ID = -1001234567890; // <-- вставь ID твоего игрового чата
 
+// --- Авто-тексты для сообщений ---
+const autoTexts = [
+  "🏎 Добро пожаловать в TkmRace! Готов к гонке?",
+  "🔥 В TkmRace только самые быстрые становятся чемпионами!",
+  "⚡ Улучши свою реакцию — участвуй в TkmRace прямо сейчас!",
+  "🎮 TkmRace ждёт тебя: скорость, драйв и адреналин!",
+];
+
 // --- Утилиты ---
 async function sendMessage(chatId: number, text: string, markdown = false, replyTo?: number) {
+  const body: any = { chat_id: chatId, text };
+  if (markdown) body.parse_mode = "Markdown";
+  if (replyTo) body.reply_to_message_id = replyTo;
+
   await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ 
-      chat_id: chatId, 
-      text,
-      parse_mode: markdown ? "Markdown" : undefined,
-      reply_to_message_id: replyTo
-    }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -81,10 +88,7 @@ async function unmuteUser(chatId: number, userId: number) {
   });
 }
 
-// --- Проверка админства (учитываем HedgehogChronicle) ---
-async function isAdmin(chatId: number, userId: number, username?: string) {
-  if (username === "HedgehogChronicle") return true;
-
+async function isAdmin(chatId: number, userId: number) {
   const res = await fetch(`${TELEGRAM_API}/getChatMember?chat_id=${chatId}&user_id=${userId}`);
   const data = await res.json();
   if (!data.ok) return false;
@@ -132,15 +136,8 @@ function formatUntilDateTM(unixTime: number): string {
 }
 
 // --- Авто-сообщения про игру ---
-const texts = [
-  "🏎 Добро пожаловать в TkmRace! Готов к гонке?",
-  "🔥 В TkmRace только самые быстрые становятся чемпионами!",
-  "⚡ Улучши свою реакцию — участвуй в TkmRace прямо сейчас!",
-  "🎮 TkmRace ждёт тебя: скорость, драйв и адреналин!",
-];
-
 setInterval(async () => {
-  const randomText = texts[Math.floor(Math.random() * texts.length)];
+  const randomText = autoTexts[Math.floor(Math.random() * autoTexts.length)];
   await sendMessage(GAME_CHAT_ID, randomText);
 }, 60 * 1000);
 
@@ -178,23 +175,35 @@ serve(async (req: Request) => {
     const chatId = update.message.chat.id;
     const userId = update.message.from.id;
     const userName = update.message.from.first_name;
-    const username = update.message.from.username;
     const messageId = update.message.message_id;
     const text = update.message.text;
 
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
 
+    // --- Ответ на сообщения канала HedgehogChronicle ---
+    if (update.message.sender_chat?.username === "HedgehogChronicle") {
+      const randomText = autoTexts[Math.floor(Math.random() * autoTexts.length)];
+      await sendMessage(chatId, randomText, false, messageId);
+      return new Response("ok");
+    }
+
     // --- /mute ---
     if (text.startsWith("/mute") && update.message.reply_to_message) {
       const targetUser = update.message.reply_to_message.from;
 
-      // Если мутят админа или HedgehogChronicle — просто удалить команду
-      if (await isAdmin(chatId, targetUser.id, targetUser.username) || !(await isAdmin(chatId, userId, username))) {
+      // Если админ пытается замутить админа — просто удалить команду
+      if (await isAdmin(chatId, userId) && await isAdmin(chatId, targetUser.id)) {
         await deleteMessage(chatId, messageId);
         return new Response("ok");
       }
 
-      // Время и причина
+      // Если обычный пользователь пытается использовать /mute — удалить команду
+      if (!(await isAdmin(chatId, userId))) {
+        await deleteMessage(chatId, messageId);
+        return new Response("ok");
+      }
+
+      // --- Если всё корректно, мутим ---
       const timeMatches = [...text.matchAll(/(\d+)([hm])/gi)];
       let seconds = 0;
       for (const match of timeMatches) {
@@ -224,12 +233,6 @@ serve(async (req: Request) => {
       return new Response("ok");
     }
 
-    // --- Ответ на сообщения от HedgehogChronicle ---
-    if (username === "HedgehogChronicle") {
-      const randomText = texts[Math.floor(Math.random() * texts.length)];
-      await sendMessage(chatId, randomText, false, messageId); // reply на сообщение канала
-    }
-
     // --- Проверка ссылок ---
     const links = (text.match(linkRegex) || []).map(l => l.trim());
     const whitelist = [
@@ -239,7 +242,7 @@ serve(async (req: Request) => {
 
     if (links.length > 0) {
       const hasBadLink = !links.every(link => whitelist.some(rule => rule.test(link)));
-      if (hasBadLink && !(await isAdmin(chatId, userId, username))) {
+      if (hasBadLink && !(await isAdmin(chatId, userId))) {
         await deleteMessage(chatId, messageId);
         await muteUser(chatId, userId);
         await sendMuteMessage(
@@ -265,7 +268,13 @@ serve(async (req: Request) => {
 
       if (await isAdmin(chatId, fromId)) {
         await unmuteUser(chatId, targetId);
-        await sendMessage(chatId, `🔓 Мут с [${targetName}](tg://user?id=${targetId}) снят админом.`, true);
+
+        await sendMessage(
+          chatId, 
+          `🔓 Мут с [${targetName}](tg://user?id=${targetId}) снят админом.`,
+          true
+        );
+
         await answerCallbackQuery(update.callback_query.id, "✅ Мут снят");
       } else {
         await answerCallbackQuery(update.callback_query.id, "⛔ Только админ может снимать мут", false);
@@ -275,7 +284,6 @@ serve(async (req: Request) => {
 
   return new Response("ok");
 });
-
 
 
 
