@@ -161,7 +161,7 @@ serve(async (req: Request) => {
   // --- Private ---
   if (update.message?.chat?.type === "private") {
     const chatId = update.message.chat.id;
-    await sendMessage(chatId, "👋 Salam! Men [TkmRace](https://t.me/TkmRaceChat) toparynyň boty. Men diňe oýun çatlarynda işlemäge ukybym bar.",true);
+    await sendMessage(chatId, "👋 Salam! Men [TkmRace](https://t.me/TkmRaceChat) toparynyň boty. Men diňe oýunuň çatynda işlemäge ukybym bar.",true);
     return new Response("ok");
   }
 
