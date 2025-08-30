@@ -39,7 +39,7 @@ async function sendMuteMessage(chatId: number, text: string, userId: number, use
         inline_keyboard: [[
           { text: "🔓 Mute aýyrmak", callback_data: `remove_mute_${userId}_${encodeURIComponent(userName)}` }
         ]]
-      }
+      },
     }),
   });
 }
@@ -52,7 +52,7 @@ async function deleteMessage(chatId: number, messageId: number) {
   });
 }
 
-async function muteUser(chatId: number, userId: number, seconds = 24 * 60 * 60) {
+async function muteUser(chatId: number, userId: number, seconds = 24 * 3600) {
   const untilDate = Math.floor(Date.now() / 1000) + seconds;
   await fetch(`${TELEGRAM_API}/restrictChatMember`, {
     method: "POST",
@@ -115,10 +115,10 @@ function formatDuration(seconds: number): string {
 
   let parts: string[] = [];
   if (hours > 0) {
-    parts.push(`${hours} ${hours === 1 ? "sagat" : (hours < 5 ? "sagat" : "sagat")}`);
+    parts.push(`${hours} sagat`);
   }
   if (minutes > 0) {
-    parts.push(`${minutes} ${minutes === 1 ? "minut" : (minutes < 5 ? "minut" : "minut")}`);
+    parts.push(`${minutes} minut`);
   }
   if (parts.length === 0) parts.push("birnäçe sekunt");
   return parts.join(" ");
@@ -177,20 +177,35 @@ serve(async (req: Request) => {
     const messageId = update.message.message_id;
     const text = update.message.text;
 
+    // --- Linkleri barlamak ---
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
+    const links = (text.match(linkRegex) || []).map(l => l.trim());
+    const whitelist = [
+      /^https?:\/\/t\.me\/Happ_VPN_official(\/.*)?(\?.*)?$/i,
+      /^https?:\/\/t\.me\/tmstars_chat(\/.*)?(\?.*)?$/i,
+    ];
 
-    // --- Kanaldan habar ---
-    if (update.message.sender_chat?.username === "HedgehogChronicle") {
-      const randomText = autoTexts[Math.floor(Math.random() * autoTexts.length)];
-      await sendMessage(chatId, randomText, false, messageId);
-      return new Response("ok");
+    if (links.length > 0) {
+      const hasBadLink = !links.every(link => whitelist.some(rule => rule.test(link)));
+      if (hasBadLink && !(await isAdmin(chatId, userId))) {
+        await deleteMessage(chatId, messageId);
+        const seconds = 24 * 3600;
+        await muteUser(chatId, userId, seconds);
+        await sendMuteMessage(
+          chatId,
+          `🤐 [${userName}](tg://user?id=${userId}) 24 sagat mute alyndy.\n⏳ ${formatUntilDateTM(Math.floor(Date.now()/1000) + seconds)}-e çenli\nSebäp: spam linkler`,
+          userId,
+          userName
+        );
+        return new Response("ok");
+      }
     }
 
     // --- /mute komandasy (reply we @username) ---
     if (text.startsWith("/mute")) {
       let targetUser: any;
 
-      // --- Парсим время ---
+      // --- Parse time ---
       const timeMatches = [...text.matchAll(/(\d+)([dhm])/gi)];
       let seconds = 0;
       for (const match of timeMatches) {
@@ -202,25 +217,11 @@ serve(async (req: Request) => {
       }
       if (seconds === 0) seconds = 24 * 3600;
 
-      // --- Если reply ---
+      // --- Reply check ---
       if (update.message.reply_to_message) {
         targetUser = update.message.reply_to_message.from;
       } else {
-        // --- По @username ---
-        const usernameMatch = text.match(/@(\w+)/);
-        if (usernameMatch) {
-          const username = usernameMatch[1];
-          try {
-            const res = await fetch(`${TELEGRAM_API}/getChatMember?chat_id=${chatId}&user_id=@${username}`);
-            const data = await res.json();
-            if (data.ok) targetUser = data.result.user;
-          } catch {
-            targetUser = null;
-          }
-        }
-      }
-
-      if (!targetUser) {
+        // --- By @username (works only with user_id, not username string) ---
         await deleteMessage(chatId, messageId);
         return new Response("ok");
       }
@@ -228,7 +229,7 @@ serve(async (req: Request) => {
       const reason = text.replace(/\/mute\s+(@\w+\s+)?([\ddhm\s]+)/i, "").trim();
       const untilDate = Math.floor(Date.now() / 1000) + seconds;
 
-      // --- Проверка прав ---
+      // --- Rights check ---
       if (await isAdmin(chatId, userId) && await isAdmin(chatId, targetUser.id)) {
         await deleteMessage(chatId, messageId);
         return new Response("ok");
@@ -253,27 +254,6 @@ serve(async (req: Request) => {
 
       await deleteMessage(chatId, messageId);
       return new Response("ok");
-    }
-
-    // --- Linkleri barlamak ---
-    const links = (text.match(linkRegex) || []).map(l => l.trim());
-    const whitelist = [
-      /^https?:\/\/t\.me\/Happ_VPN_official(\/.*)?(\?.*)?$/i,
-      /^https?:\/\/t\.me\/tmstars_chat(\/.*)?(\?.*)?$/i,
-    ];
-
-    if (links.length > 0) {
-      const hasBadLink = !links.every(link => whitelist.some(rule => rule.test(link)));
-      if (hasBadLink && !(await isAdmin(chatId, userId))) {
-        await deleteMessage(chatId, messageId);
-        await muteUser(chatId, userId);
-        await sendMuteMessage(
-          chatId,
-          `🤐 [${userName}](tg://user?id=${userId}) 24 sagat mute alyndy.\n⏳ ${formatUntilDateTM(Math.floor(Date.now()/1000) + 24*3600)}-e çenli\nSebäp: spam linkler`,
-          userId,
-          userName
-        );
-      }
     }
   }
 
@@ -300,6 +280,7 @@ serve(async (req: Request) => {
 
   return new Response("ok");
 });
+
 
 
 
