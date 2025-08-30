@@ -186,7 +186,7 @@ serve(async (req: Request) => {
       return new Response("ok");
     }
 
-    // --- /mute komandasy (reply we @username) ---
+    // --- /mute komandasy (reply + @username) ---
     if (text.startsWith("/mute")) {
       let targetUser: any;
 
@@ -202,31 +202,29 @@ serve(async (req: Request) => {
       }
       if (seconds === 0) seconds = 24 * 3600;
 
+      const reason = text.replace(/\/mute\s+(@\w+\s+)?([\ddhm\s]+)/i, "").trim();
+
       // --- Если reply ---
       if (update.message.reply_to_message) {
         targetUser = update.message.reply_to_message.from;
       } else {
-        // --- По @username ---
+        // --- Если нет reply, ищем админа по @username ---
         const usernameMatch = text.match(/@(\w+)/);
         if (usernameMatch) {
-          const username = usernameMatch[1];
-          try {
-            const res = await fetch(`${TELEGRAM_API}/getChatMember?chat_id=${chatId}&user_id=@${username}`);
-            const data = await res.json();
-            if (data.ok) targetUser = data.result.user;
-          } catch {
-            targetUser = null;
+          const username = usernameMatch[1].toLowerCase();
+          const adminsRes = await fetch(`${TELEGRAM_API}/getChatAdministrators?chat_id=${chatId}`);
+          const adminsData = await adminsRes.json();
+          if (adminsData.ok) {
+            targetUser = adminsData.result.find((a: any) => a.user.username?.toLowerCase() === username)?.user;
           }
         }
       }
 
+      // --- Если пользователя не нашли ---
       if (!targetUser) {
-        await deleteMessage(chatId, messageId);
+        await sendMessage(chatId, "⛔ Ulanyjy tapylmady. Reply ýa-da dogry @username ulanyň.", false);
         return new Response("ok");
       }
-
-      const reason = text.replace(/\/mute\s+(@\w+\s+)?([\ddhm\s]+)/i, "").trim();
-      const untilDate = Math.floor(Date.now() / 1000) + seconds;
 
       // --- Проверка прав ---
       if (await isAdmin(chatId, userId) && await isAdmin(chatId, targetUser.id)) {
@@ -238,8 +236,9 @@ serve(async (req: Request) => {
         return new Response("ok");
       }
 
+      // --- Мутим ---
       await muteUser(chatId, targetUser.id, seconds);
-
+      const untilDate = Math.floor(Date.now() / 1000) + seconds;
       const durationText = formatDuration(seconds);
       const untilText = formatUntilDateTM(untilDate);
       const reasonText = reason ? `Sebäp: ${reason}` : "";
