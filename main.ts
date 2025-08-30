@@ -190,7 +190,7 @@ serve(async (req: Request) => {
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
 
     // --- Kanaldan habar ---
-    if (update.message.sender_chat?.username === "HedgehogChronicle") {
+    if (update.message.sender_chat?.username === "TkmRace") {
       const randomText = autoTexts[Math.floor(Math.random() * autoTexts.length)];
       await sendMessage(chatId, randomText, false, messageId);
       return new Response("ok");
@@ -256,7 +256,7 @@ serve(async (req: Request) => {
 
       await sendMuteMessage(
         chatId,
-        `🤐 [${targetUser.first_name}](tg://user?id=${targetUser.id}) ${durationText}lygyna mute alyndy.\n⏳ ${untilText}-e çenli\n${reasonText}`,
+        `🤐 [${targetUser.first_name}](tg://user?id=${targetUser.id}) ${durationText}lygyna sessizlige alyndy.\n⏳ ${untilText}-e çenli\n${reasonText}`,
         targetUser.id,
         targetUser.first_name
       );
@@ -268,8 +268,8 @@ serve(async (req: Request) => {
     // --- Linkleri barlamak ---
     const links = (text.match(linkRegex) || []).map(l => l.trim());
     const whitelist = [
-      /^https?:\/\/t\.me\/Happ_VPN_official(\/.*)?(\?.*)?$/i,
-      /^https?:\/\/t\.me\/tmstars_chat(\/.*)?(\?.*)?$/i,
+      /^https?:\/\/t\.me\/TkmRace(\/.*)?(\?.*)?$/i,
+      /^https?:\/\/t\.me\/TkmRace(\/.*)?(\?.*)?$/i,
     ];
 
     if (links.length > 0) {
@@ -279,7 +279,7 @@ serve(async (req: Request) => {
         await muteUser(chatId, userId);
         await sendMuteMessage(
           chatId,
-          `🤐 [${userName}](tg://user?id=${userId}) 24 sagat mute alyndy.\n⏳ ${formatUntilDateTM(Math.floor(Date.now()/1000) + 24*3600)}-e çenli\nSebäp: spam linkler`,
+          `🤐 [${userName}](tg://user?id=${userId}) 24 sagat sessize alyndy.\n⏳ ${formatUntilDateTM(Math.floor(Date.now()/1000) + 24*3600)}-e çenli\nSebäp: spam linkler`,
           userId,
           userName
         );
@@ -300,10 +300,10 @@ serve(async (req: Request) => {
 
       if (await isAdmin(chatId, fromId)) {
         await unmuteUser(chatId, targetId);
-        await sendMessage(chatId, `🔓 [${targetName}](tg://user?id=${targetId}) mute administrator tarapyndan aýryldy.`, true);
-        await answerCallbackQuery(update.callback_query.id, "✅ Mute aýryldy");
+        await sendMessage(chatId, `🔓 [${targetName}](tg://user?id=${targetId}) sessizligiň administrator tarapyndan aýryldy.`, true);
+        await answerCallbackQuery(update.callback_query.id, "✅ Sessizlik aýryldy");
       } else {
-        await answerCallbackQuery(update.callback_query.id, "⛔ Diňe administrator mute aýryp biler", false);
+        await answerCallbackQuery(update.callback_query.id, "⛔ Diňe administrator sessizligi aýyryp biler", false);
       }
     }
   }
