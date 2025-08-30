@@ -7,11 +7,15 @@ const SECRET_PATH = "/tkmracehelper";
 const GAME_CHAT_ID = -1001234567890; // <-- вставь ID твоего игрового чата
 
 // --- Утилиты ---
-async function sendMessage(chatId: number, text: string) {
+async function sendMessage(chatId: number, text: string, markdown = false) {
   await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text }),
+    body: JSON.stringify({ 
+      chat_id: chatId, 
+      text,
+      parse_mode: markdown ? "Markdown" : undefined 
+    }),
   });
 }
 
@@ -231,7 +235,17 @@ serve(async (req: Request) => {
       const targetId = parseInt(data.replace("remove_mute_", ""));
       if (await isAdmin(chatId, fromId)) {
         await unmuteUser(chatId, targetId);
-        await sendMessage(chatId, `🔓 Мут пользователя снят админом.`);
+
+        // Пишем с кликабельным именем
+        const targetUser = update.callback_query.message.reply_to_message?.from;
+        const targetName = targetUser?.first_name || "Пользователь";
+
+        await sendMessage(
+          chatId, 
+          `🔓 Мут с [${targetName}](tg://user?id=${targetId}) снят админом.`,
+          true
+        );
+
         await answerCallbackQuery(update.callback_query.id, "✅ Мут снят");
       } else {
         await answerCallbackQuery(update.callback_query.id, "⛔ Только админ может снимать мут", false);
@@ -241,6 +255,7 @@ serve(async (req: Request) => {
 
   return new Response("ok");
 });
+
 
 
 
