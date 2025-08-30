@@ -6,16 +6,24 @@ const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
 const SECRET_PATH = "/tkmracehelper"; 
 const GAME_CHAT_ID = -1001234567890; // <-- вставь ID твоего игрового чата
 
+// --- Авто-тексты для сообщений ---
+const autoTexts = [
+  "🏎 Добро пожаловать в TkmRace! Готов к гонке?",
+  "🔥 В TkmRace только самые быстрые становятся чемпионами!",
+  "⚡ Улучши свою реакцию — участвуй в TkmRace прямо сейчас!",
+  "🎮 TkmRace ждёт тебя: скорость, драйв и адреналин!",
+];
+
 // --- Утилиты ---
-async function sendMessage(chatId: number, text: string, markdown = false) {
+async function sendMessage(chatId: number, text: string, markdown = false, replyTo?: number) {
+  const body: any = { chat_id: chatId, text };
+  if (markdown) body.parse_mode = "Markdown";
+  if (replyTo) body.reply_to_message_id = replyTo;
+
   await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ 
-      chat_id: chatId, 
-      text,
-      parse_mode: markdown ? "Markdown" : undefined 
-    }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -128,13 +136,6 @@ function formatUntilDateTM(unixTime: number): string {
 }
 
 // --- Авто-сообщения про игру ---
-const autoTexts = [
-  "🏎 Добро пожаловать в TkmRace! Готов к гонке?",
-  "🔥 В TkmRace только самые быстрые становятся чемпионами!",
-  "⚡ Улучши свою реакцию — участвуй в TkmRace прямо сейчас!",
-  "🎮 TkmRace ждёт тебя: скорость, драйв и адреналин!",
-];
-
 setInterval(async () => {
   const randomText = autoTexts[Math.floor(Math.random() * autoTexts.length)];
   await sendMessage(GAME_CHAT_ID, randomText);
@@ -179,10 +180,10 @@ serve(async (req: Request) => {
 
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
 
-    // --- Ответ на сообщения от канала HedgehogChronicle ---
+    // --- Ответ на сообщения канала HedgehogChronicle ---
     if (update.message.sender_chat?.username === "HedgehogChronicle") {
       const randomText = autoTexts[Math.floor(Math.random() * autoTexts.length)];
-      await sendMessage(chatId, randomText);
+      await sendMessage(chatId, randomText, false, messageId);
       return new Response("ok");
     }
 
@@ -190,13 +191,19 @@ serve(async (req: Request) => {
     if (text.startsWith("/mute") && update.message.reply_to_message) {
       const targetUser = update.message.reply_to_message.from;
 
-      // Если цель — админ или сообщение не от админа, просто удалить команду
-      if (await isAdmin(chatId, targetUser.id) || !(await isAdmin(chatId, userId))) {
+      // Если админ пытается замутить админа — просто удалить команду
+      if (await isAdmin(chatId, userId) && await isAdmin(chatId, targetUser.id)) {
         await deleteMessage(chatId, messageId);
         return new Response("ok");
       }
 
-      // Время мьюта
+      // Если обычный пользователь пытается использовать /mute — удалить команду
+      if (!(await isAdmin(chatId, userId))) {
+        await deleteMessage(chatId, messageId);
+        return new Response("ok");
+      }
+
+      // --- Если всё корректно, мутим ---
       const timeMatches = [...text.matchAll(/(\d+)([hm])/gi)];
       let seconds = 0;
       for (const match of timeMatches) {
@@ -209,7 +216,6 @@ serve(async (req: Request) => {
 
       const reason = text.replace(/\/mute\s+([\dhm\s]+)/i, "").trim();
       const untilDate = Math.floor(Date.now() / 1000) + seconds;
-
       await muteUser(chatId, targetUser.id, seconds);
 
       const durationText = formatDuration(seconds);
@@ -278,6 +284,7 @@ serve(async (req: Request) => {
 
   return new Response("ok");
 });
+
 
 
 
