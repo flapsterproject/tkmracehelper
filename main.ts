@@ -116,6 +116,16 @@ function formatDuration(seconds: number): string {
   return parts.length > 0 ? parts.join(" ") : "несколько секунд";
 }
 
+function formatUntilDate(unixTime: number): string {
+  const d = new Date(unixTime * 1000);
+  const dd = d.getDate().toString().padStart(2, "0");
+  const mm = (d.getMonth() + 1).toString().padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const hh = d.getHours().toString().padStart(2, "0");
+  const min = d.getMinutes().toString().padStart(2, "0");
+  return `${dd}.${mm}.${yyyy} ${hh}:${min}`;
+}
+
 // --- Авто-сообщения про игру ---
 setInterval(async () => {
   const texts = [
@@ -184,13 +194,16 @@ serve(async (req: Request) => {
 
         const reason = text.replace(/\/mute\s+([\dhm\s]+)/i, "").trim();
 
+        const untilDate = Math.floor(Date.now() / 1000) + seconds;
         await muteUser(chatId, targetUser.id, seconds);
 
         const durationText = formatDuration(seconds);
-        const reasonText = reason ? `Причина: ${reason}` : "";
+        const reasonText = reason ? `Причина: ${reason}\n` : "";
+        const untilText = formatUntilDate(untilDate);
+
         await sendMuteMessage(
           chatId,
-          `🤐 [${targetUser.first_name}](tg://user?id=${targetUser.id}) получил мут на ${durationText}. ${reasonText}`,
+          `🤐 [${targetUser.first_name}](tg://user?id=${targetUser.id}) получил мут на ${durationText}.\n${reasonText}⏳ До ${untilText}`,
           targetUser.id,
           targetUser.first_name
         );
@@ -214,7 +227,7 @@ serve(async (req: Request) => {
         await muteUser(chatId, userId);
         await sendMuteMessage(
           chatId,
-          `🤐 [${userName}](tg://user?id=${userId}) получил мут на 24 часа за спам.`,
+          `🤐 [${userName}](tg://user?id=${userId}) получил мут на 24 часа.\nПричина: спам ссылками\n⏳ До ${formatUntilDate(Math.floor(Date.now()/1000) + 24*3600)}`,
           userId,
           userName
         );
@@ -251,6 +264,7 @@ serve(async (req: Request) => {
 
   return new Response("ok");
 });
+
 
 
 
