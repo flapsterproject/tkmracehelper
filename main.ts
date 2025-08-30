@@ -287,7 +287,7 @@ serve(async (req: Request) => {
     }
   }
 
-  // --- Inline knopka "Mute aýyrmak" ---
+  // --- Inline knopka "sessizligi aýyrmak" ---
   if (update.callback_query) {
     const chatId = update.callback_query.message.chat.id;
     const fromId = update.callback_query.from.id;
