@@ -180,39 +180,45 @@ serve(async (req: Request) => {
 
     // --- /mute ---
     if (text.startsWith("/mute") && update.message.reply_to_message) {
-      if (await isAdmin(chatId, userId)) {
-        const targetUser = update.message.reply_to_message.from;
+      const targetUser = update.message.reply_to_message.from;
+      const senderIsAdmin = await isAdmin(chatId, userId);
+      const targetIsAdmin = await isAdmin(chatId, targetUser.id);
 
-        const timeMatches = [...text.matchAll(/(\d+)([hm])/gi)];
-        let seconds = 0;
-        for (const match of timeMatches) {
-          const value = parseInt(match[1]);
-          const unit = match[2].toLowerCase();
-          if (unit === "h") seconds += value * 3600;
-          if (unit === "m") seconds += value * 60;
-        }
-        if (seconds === 0) seconds = 24 * 3600;
-
-        const reason = text.replace(/\/mute\s+([\dhm\s]+)/i, "").trim();
-
-        const untilDate = Math.floor(Date.now() / 1000) + seconds;
-        await muteUser(chatId, targetUser.id, seconds);
-
-        const durationText = formatDuration(seconds);
-        const untilText = formatUntilDateTM(untilDate);
-
-        const reasonText = reason ? `Причина: ${reason}` : "";
-
-        await sendMuteMessage(
-          chatId,
-          `🤐 [${targetUser.first_name}](tg://user?id=${targetUser.id}) получил мут на ${durationText}.\n⏳ До ${untilText}\n${reasonText}`,
-          targetUser.id,
-          targetUser.first_name
-        );
-
+      // Если цель — админ или отправитель не админ — просто удаляем команду
+      if (targetIsAdmin || !senderIsAdmin) {
         await deleteMessage(chatId, messageId);
         return new Response("ok");
-      } else return new Response("ok");
+      }
+
+      // Парсим время и причину
+      const timeMatches = [...text.matchAll(/(\d+)([hm])/gi)];
+      let seconds = 0;
+      for (const match of timeMatches) {
+        const value = parseInt(match[1]);
+        const unit = match[2].toLowerCase();
+        if (unit === "h") seconds += value * 3600;
+        if (unit === "m") seconds += value * 60;
+      }
+      if (seconds === 0) seconds = 24 * 3600;
+
+      const reason = text.replace(/\/mute\s+([\dhm\s]+)/i, "").trim();
+      const untilDate = Math.floor(Date.now() / 1000) + seconds;
+
+      await muteUser(chatId, targetUser.id, seconds);
+
+      const durationText = formatDuration(seconds);
+      const untilText = formatUntilDateTM(untilDate);
+      const reasonText = reason ? `Причина: ${reason}` : "";
+
+      await sendMuteMessage(
+        chatId,
+        `🤐 [${targetUser.first_name}](tg://user?id=${targetUser.id}) получил мут на ${durationText}.\n⏳ До ${untilText}\n${reasonText}`,
+        targetUser.id,
+        targetUser.first_name
+      );
+
+      await deleteMessage(chatId, messageId);
+      return new Response("ok");
     }
 
     // --- Проверка ссылок ---
