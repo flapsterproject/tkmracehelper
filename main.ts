@@ -246,7 +246,7 @@ serve(async (req: Request) => {
 
       await sendMuteMessage(
         chatId,
-        `🤐 [${targetUser.first_name}](tg://user?id=${targetUser.id}) ${durationText}-e çenli mute alyndy.\n⏳ ${untilText}-e çenli\n${reasonText}`,
+        `🤐 [${targetUser.first_name}](tg://user?id=${targetUser.id}) ${durationText}lygyna mute alyndy.\n⏳ ${untilText}-e çenli\n${reasonText}`,
         targetUser.id,
         targetUser.first_name
       );
