@@ -4,17 +4,17 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 const TOKEN = Deno.env.get("BOT_TOKEN")!;
 const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
 const SECRET_PATH = "/tkmracehelper"; 
-const GAME_CHAT_ID = -1001234567890; // <-- вставь ID твоего игрового чата
+const GAME_CHAT_ID = -1001234567890; // <-- ID oýun çat
 
-// --- Авто-тексты для сообщений ---
+// --- Avto-tekster ---
 const autoTexts = [
-  "🏎 Добро пожаловать в TkmRace! Готов к гонке?",
-  "🔥 В TkmRace только самые быстрые становятся чемпионами!",
-  "⚡ Улучши свою реакцию — участвуй в TkmRace прямо сейчас!",
-  "🎮 TkmRace ждёт тебя: скорость, драйв и адреналин!",
+  "🏎 TkmRace-a hoş geldiň! Ýaryşa taýarmyň?",
+  "🔥 TkmRace-de diňe iň çaltlar çempion bolýar!",
+  "⚡ Reaksiýaňy ýokarlandyr — TkmRace-de gatnaş!",
+  "🎮 TkmRace seni garaşýar: tizlik, şowhun we adrenalin!",
 ];
 
-// --- Утилиты ---
+// --- Utylity ---
 async function sendMessage(chatId: number, text: string, markdown = false, replyTo?: number) {
   const body: any = { chat_id: chatId, text };
   if (markdown) body.parse_mode = "Markdown";
@@ -37,7 +37,7 @@ async function sendMuteMessage(chatId: number, text: string, userId: number, use
       parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [[
-          { text: "🔓 Снять мут", callback_data: `remove_mute_${userId}_${encodeURIComponent(userName)}` }
+          { text: "🔓 Mute aýyrmak", callback_data: `remove_mute_${userId}_${encodeURIComponent(userName)}` }
         ]]
       }
     }),
@@ -108,25 +108,24 @@ async function answerCallbackQuery(callbackQueryId: string, text: string, showAl
   });
 }
 
-// --- Форматирование времени ---
+// --- Formatlama ---
 function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
 
   let parts: string[] = [];
   if (hours > 0) {
-    parts.push(`${hours} ${hours === 1 ? "час" : (hours < 5 ? "часа" : "часов")}`);
+    parts.push(`${hours} ${hours === 1 ? "sagat" : (hours < 5 ? "sagat" : "sagat")}`);
   }
   if (minutes > 0) {
-    parts.push(`${minutes} ${minutes === 1 ? "минута" : (minutes < 5 ? "минуты" : "минут")}`);
+    parts.push(`${minutes} ${minutes === 1 ? "minut" : (minutes < 5 ? "minut" : "minut")}`);
   }
-
-  return parts.length > 0 ? parts.join(" ") : "несколько секунд";
+  if (parts.length === 0) parts.push("birnäçe sekunt");
+  return parts.join(" ");
 }
 
-// --- Форматируем дату по Туркменистану (UTC+5) ---
 function formatUntilDateTM(unixTime: number): string {
-  const d = new Date((unixTime + 5*3600) * 1000); // UTC+5
+  const d = new Date((unixTime + 5*3600) * 1000);
   const dd = d.getDate().toString().padStart(2, "0");
   const mm = (d.getMonth() + 1).toString().padStart(2, "0");
   const yyyy = d.getFullYear();
@@ -135,13 +134,13 @@ function formatUntilDateTM(unixTime: number): string {
   return `${dd}.${mm}.${yyyy} ${hh}:${min}`;
 }
 
-// --- Авто-сообщения про игру ---
+// --- Avto-habarlar ---
 setInterval(async () => {
   const randomText = autoTexts[Math.floor(Math.random() * autoTexts.length)];
   await sendMessage(GAME_CHAT_ID, randomText);
 }, 60 * 1000);
 
-// --- Сервер ---
+// --- Server ---
 serve(async (req: Request) => {
   if (new URL(req.url).pathname !== SECRET_PATH) {
     return new Response("Not Found", { status: 404 });
@@ -149,28 +148,28 @@ serve(async (req: Request) => {
 
   const update = await req.json();
 
-  // --- Личка ---
+  // --- Private ---
   if (update.message?.chat?.type === "private") {
     const chatId = update.message.chat.id;
-    await sendMessage(chatId, "👋 Привет! Я бот группы TkmRace. Работать я могу только в чате игры.");
+    await sendMessage(chatId, "👋 Salam! Men TkmRace toparynyň boty. Men diňe oýun çatlarynda işlemäge ukybym bar.");
     return new Response("ok");
   }
 
-  // --- Приветствие новых ---
+  // --- Täze ulanyjy ---
   if (update.message?.new_chat_member) {
     const user = update.message.new_chat_member;
     const chatId = update.message.chat.id;
-    await sendMessage(chatId, `Добро пожаловать, [${user.first_name}](tg://user?id=${user.id})! 🎉`, true);
+    await sendMessage(chatId, `Hoş geldiň, [${user.first_name}](tg://user?id=${user.id})! 🎉`, true);
   }
 
-  // --- Выход пользователя ---
+  // --- Ulanyjy çykan ýagdaýynda ---
   if (update.message?.left_chat_member) {
     const user = update.message.left_chat_member;
     const chatId = update.message.chat.id;
-    await sendMessage(chatId, `👋 [${user.first_name}](tg://user?id=${user.id}) покинул чат.`, true);
+    await sendMessage(chatId, `👋 [${user.first_name}](tg://user?id=${user.id}) topardan çykdy.`, true);
   }
 
-  // --- Текстовые сообщения ---
+  // --- Teskt habarlary ---
   if (update.message?.text) {
     const chatId = update.message.chat.id;
     const userId = update.message.from.id;
@@ -180,51 +179,74 @@ serve(async (req: Request) => {
 
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
 
-    // --- Ответ на сообщения канала HedgehogChronicle ---
+    // --- Kanaldan habar ---
     if (update.message.sender_chat?.username === "HedgehogChronicle") {
       const randomText = autoTexts[Math.floor(Math.random() * autoTexts.length)];
       await sendMessage(chatId, randomText, false, messageId);
       return new Response("ok");
     }
 
-    // --- /mute ---
-    if (text.startsWith("/mute") && update.message.reply_to_message) {
-      const targetUser = update.message.reply_to_message.from;
+    // --- /mute komandasy (reply we @username) ---
+    if (text.startsWith("/mute")) {
+      let targetUser: any;
 
-      // Если админ пытается замутить админа — просто удалить команду
-      if (await isAdmin(chatId, userId) && await isAdmin(chatId, targetUser.id)) {
-        await deleteMessage(chatId, messageId);
-        return new Response("ok");
-      }
-
-      // Если обычный пользователь пытается использовать /mute — удалить команду
-      if (!(await isAdmin(chatId, userId))) {
-        await deleteMessage(chatId, messageId);
-        return new Response("ok");
-      }
-
-      // --- Если всё корректно, мутим ---
-      const timeMatches = [...text.matchAll(/(\d+)([hm])/gi)];
+      // --- Парсим время ---
+      const timeMatches = [...text.matchAll(/(\d+)([dhm])/gi)];
       let seconds = 0;
       for (const match of timeMatches) {
         const value = parseInt(match[1]);
         const unit = match[2].toLowerCase();
+        if (unit === "d") seconds += value * 86400;
         if (unit === "h") seconds += value * 3600;
         if (unit === "m") seconds += value * 60;
       }
       if (seconds === 0) seconds = 24 * 3600;
 
-      const reason = text.replace(/\/mute\s+([\dhm\s]+)/i, "").trim();
+      // --- Если reply ---
+      if (update.message.reply_to_message) {
+        targetUser = update.message.reply_to_message.from;
+      } else {
+        // --- По @username ---
+        const usernameMatch = text.match(/@(\w+)/);
+        if (usernameMatch) {
+          const username = usernameMatch[1];
+          try {
+            const res = await fetch(`${TELEGRAM_API}/getChatMember?chat_id=${chatId}&user_id=@${username}`);
+            const data = await res.json();
+            if (data.ok) targetUser = data.result.user;
+          } catch {
+            targetUser = null;
+          }
+        }
+      }
+
+      if (!targetUser) {
+        await deleteMessage(chatId, messageId);
+        return new Response("ok");
+      }
+
+      const reason = text.replace(/\/mute\s+(@\w+\s+)?([\ddhm\s]+)/i, "").trim();
       const untilDate = Math.floor(Date.now() / 1000) + seconds;
+
+      // --- Проверка прав ---
+      if (await isAdmin(chatId, userId) && await isAdmin(chatId, targetUser.id)) {
+        await deleteMessage(chatId, messageId);
+        return new Response("ok");
+      }
+      if (!(await isAdmin(chatId, userId))) {
+        await deleteMessage(chatId, messageId);
+        return new Response("ok");
+      }
+
       await muteUser(chatId, targetUser.id, seconds);
 
       const durationText = formatDuration(seconds);
       const untilText = formatUntilDateTM(untilDate);
-      const reasonText = reason ? `Причина: ${reason}` : "";
+      const reasonText = reason ? `Sebäp: ${reason}` : "";
 
       await sendMuteMessage(
         chatId,
-        `🤐 [${targetUser.first_name}](tg://user?id=${targetUser.id}) получил мут на ${durationText}.\n⏳ До ${untilText}\n${reasonText}`,
+        `🤐 [${targetUser.first_name}](tg://user?id=${targetUser.id}) ${durationText}-e çenli mute alyndy.\n⏳ ${untilText}-e çenli\n${reasonText}`,
         targetUser.id,
         targetUser.first_name
       );
@@ -233,7 +255,7 @@ serve(async (req: Request) => {
       return new Response("ok");
     }
 
-    // --- Проверка ссылок ---
+    // --- Linkleri barlamak ---
     const links = (text.match(linkRegex) || []).map(l => l.trim());
     const whitelist = [
       /^https?:\/\/t\.me\/Happ_VPN_official(\/.*)?(\?.*)?$/i,
@@ -247,7 +269,7 @@ serve(async (req: Request) => {
         await muteUser(chatId, userId);
         await sendMuteMessage(
           chatId,
-          `🤐 [${userName}](tg://user?id=${userId}) получил мут на 24 часа.\n⏳ До ${formatUntilDateTM(Math.floor(Date.now()/1000) + 24*3600)}\nПричина: спам ссылками`,
+          `🤐 [${userName}](tg://user?id=${userId}) 24 sagat mute alyndy.\n⏳ ${formatUntilDateTM(Math.floor(Date.now()/1000) + 24*3600)}-e çenli\nSebäp: spam linkler`,
           userId,
           userName
         );
@@ -255,7 +277,7 @@ serve(async (req: Request) => {
     }
   }
 
-  // --- Кнопка "Снять мут" ---
+  // --- Inline knopka "Mute aýyrmak" ---
   if (update.callback_query) {
     const chatId = update.callback_query.message.chat.id;
     const fromId = update.callback_query.from.id;
@@ -268,22 +290,17 @@ serve(async (req: Request) => {
 
       if (await isAdmin(chatId, fromId)) {
         await unmuteUser(chatId, targetId);
-
-        await sendMessage(
-          chatId, 
-          `🔓 Мут с [${targetName}](tg://user?id=${targetId}) снят админом.`,
-          true
-        );
-
-        await answerCallbackQuery(update.callback_query.id, "✅ Мут снят");
+        await sendMessage(chatId, `🔓 [${targetName}](tg://user?id=${targetId}) mute administrator tarapyndan aýryldy.`, true);
+        await answerCallbackQuery(update.callback_query.id, "✅ Mute aýryldy");
       } else {
-        await answerCallbackQuery(update.callback_query.id, "⛔ Только админ может снимать мут", false);
+        await answerCallbackQuery(update.callback_query.id, "⛔ Diňe administrator mute aýryp biler", false);
       }
     }
   }
 
   return new Response("ok");
 });
+
 
 
 
