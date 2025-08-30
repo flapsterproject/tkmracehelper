@@ -279,7 +279,7 @@ serve(async (req: Request) => {
         await muteUser(chatId, userId);
         await sendMuteMessage(
           chatId,
-          `🤐 [${userName}](tg://user?id=${userId}) 24 sagat sessize alyndy.\n⏳ ${formatUntilDateTM(Math.floor(Date.now()/1000) + 24*3600)}-e çenli\nSebäp: spam linkler`,
+          `🤐 [${userName}](tg://user?id=${userId}) 24 sagat sessize alyndy.\n⏳ ${formatUntilDateTM(Math.floor(Date.now()/1000) + 24*3600)}-e çenli\nSebäp: Spam sylkalar`,
           userId,
           userName
         );
