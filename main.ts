@@ -128,14 +128,15 @@ function formatUntilDateTM(unixTime: number): string {
 }
 
 // --- Авто-сообщения про игру ---
+const autoTexts = [
+  "🏎 Добро пожаловать в TkmRace! Готов к гонке?",
+  "🔥 В TkmRace только самые быстрые становятся чемпионами!",
+  "⚡ Улучши свою реакцию — участвуй в TkmRace прямо сейчас!",
+  "🎮 TkmRace ждёт тебя: скорость, драйв и адреналин!",
+];
+
 setInterval(async () => {
-  const texts = [
-    "🏎 Добро пожаловать в TkmRace! Готов к гонке?",
-    "🔥 В TkmRace только самые быстрые становятся чемпионами!",
-    "⚡ Улучши свою реакцию — участвуй в TkmRace прямо сейчас!",
-    "🎮 TkmRace ждёт тебя: скорость, драйв и адреналин!",
-  ];
-  const randomText = texts[Math.floor(Math.random() * texts.length)];
+  const randomText = autoTexts[Math.floor(Math.random() * autoTexts.length)];
   await sendMessage(GAME_CHAT_ID, randomText);
 }, 60 * 1000);
 
@@ -178,19 +179,24 @@ serve(async (req: Request) => {
 
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
 
+    // --- Ответ на сообщения от канала HedgehogChronicle ---
+    if (update.message.sender_chat?.username === "HedgehogChronicle") {
+      const randomText = autoTexts[Math.floor(Math.random() * autoTexts.length)];
+      await sendMessage(chatId, randomText);
+      return new Response("ok");
+    }
+
     // --- /mute ---
     if (text.startsWith("/mute") && update.message.reply_to_message) {
       const targetUser = update.message.reply_to_message.from;
-      const senderIsAdmin = await isAdmin(chatId, userId);
-      const targetIsAdmin = await isAdmin(chatId, targetUser.id);
 
-      // Если цель — админ или отправитель не админ — просто удаляем команду
-      if (targetIsAdmin || !senderIsAdmin) {
+      // Если цель — админ или сообщение не от админа, просто удалить команду
+      if (await isAdmin(chatId, targetUser.id) || !(await isAdmin(chatId, userId))) {
         await deleteMessage(chatId, messageId);
         return new Response("ok");
       }
 
-      // Парсим время и причину
+      // Время мьюта
       const timeMatches = [...text.matchAll(/(\d+)([hm])/gi)];
       let seconds = 0;
       for (const match of timeMatches) {
@@ -272,6 +278,7 @@ serve(async (req: Request) => {
 
   return new Response("ok");
 });
+
 
 
 
