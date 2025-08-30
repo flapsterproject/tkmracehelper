@@ -95,6 +95,22 @@ async function answerCallbackQuery(callbackQueryId: string, text: string, showAl
   });
 }
 
+// --- Форматирование времени ---
+function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+
+  let parts: string[] = [];
+  if (hours > 0) {
+    parts.push(`${hours} ${hours === 1 ? "час" : (hours < 5 ? "часа" : "часов")}`);
+  }
+  if (minutes > 0) {
+    parts.push(`${minutes} ${minutes === 1 ? "минута" : (minutes < 5 ? "минуты" : "минут")}`);
+  }
+
+  return parts.length > 0 ? parts.join(" ") : "несколько секунд";
+}
+
 // --- Авто-сообщения про игру ---
 setInterval(async () => {
   const texts = [
@@ -146,30 +162,34 @@ serve(async (req: Request) => {
 
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
 
-    // --- /mute с временем и причиной (только reply от админа) ---
+    // --- /mute с несколькими интервалами и причиной (только reply от админа) ---
     if (text.startsWith("/mute") && update.message.reply_to_message) {
       if (await isAdmin(chatId, userId)) {
         const targetUser = update.message.reply_to_message.from;
 
-        // Парсим команду: /mute 1h причина
-        const match = text.match(/\/mute\s+(\d+)([hm])\s*(.*)/i);
-        let seconds = 24 * 60 * 60; // по умолчанию 24ч
-        let reason = "";
+        // Ищем все интервалы: /mute 1h 30m Flood
+        const timeMatches = [...text.matchAll(/(\d+)([hm])/gi)];
+        let seconds = 0;
 
-        if (match) {
+        for (const match of timeMatches) {
           const value = parseInt(match[1]);
           const unit = match[2].toLowerCase();
-          seconds = unit === "h" ? value * 3600 : value * 60;
-          reason = match[3]?.trim() || "";
+          if (unit === "h") seconds += value * 3600;
+          if (unit === "m") seconds += value * 60;
         }
+
+        if (seconds === 0) seconds = 24 * 3600; // по умолчанию 24ч
+
+        // Получаем причину (текст после интервалов)
+        const reason = text.replace(/\/mute\s+([\dhm\s]+)/i, "").trim();
 
         await muteUser(chatId, targetUser.id, seconds);
 
-        const timeText = match ? `${match[1]}${match[2]}` : "24h";
+        const durationText = formatDuration(seconds);
         const reasonText = reason ? `Причина: ${reason}` : "";
         await sendMuteMessage(
           chatId,
-          `🤐 ${targetUser.first_name} получил мут на ${timeText}. ${reasonText}`,
+          `🤐 ${targetUser.first_name} получил мут на ${durationText}. ${reasonText}`,
           targetUser.id
         );
 
@@ -221,7 +241,6 @@ serve(async (req: Request) => {
 
   return new Response("ok");
 });
-
 
 
 
