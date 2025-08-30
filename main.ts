@@ -116,8 +116,9 @@ function formatDuration(seconds: number): string {
   return parts.length > 0 ? parts.join(" ") : "несколько секунд";
 }
 
-function formatUntilDate(unixTime: number): string {
-  const d = new Date(unixTime * 1000);
+// --- Форматируем дату по Туркменистану (UTC+5) ---
+function formatUntilDateTM(unixTime: number): string {
+  const d = new Date((unixTime + 5*3600) * 1000); // UTC+5
   const dd = d.getDate().toString().padStart(2, "0");
   const mm = (d.getMonth() + 1).toString().padStart(2, "0");
   const yyyy = d.getFullYear();
@@ -198,12 +199,13 @@ serve(async (req: Request) => {
         await muteUser(chatId, targetUser.id, seconds);
 
         const durationText = formatDuration(seconds);
-        const reasonText = reason ? `Причина: ${reason}\n` : "";
-        const untilText = formatUntilDate(untilDate);
+        const untilText = formatUntilDateTM(untilDate);
+
+        const reasonText = reason ? `Причина: ${reason}` : "";
 
         await sendMuteMessage(
           chatId,
-          `🤐 [${targetUser.first_name}](tg://user?id=${targetUser.id}) получил мут на ${durationText}.\n${reasonText}⏳ До ${untilText}`,
+          `🤐 [${targetUser.first_name}](tg://user?id=${targetUser.id}) получил мут на ${durationText}.\n⏳ До ${untilText}\n${reasonText}`,
           targetUser.id,
           targetUser.first_name
         );
@@ -227,7 +229,7 @@ serve(async (req: Request) => {
         await muteUser(chatId, userId);
         await sendMuteMessage(
           chatId,
-          `🤐 [${userName}](tg://user?id=${userId}) получил мут на 24 часа.\nПричина: спам ссылками\n⏳ До ${formatUntilDate(Math.floor(Date.now()/1000) + 24*3600)}`,
+          `🤐 [${userName}](tg://user?id=${userId}) получил мут на 24 часа.\n⏳ До ${formatUntilDateTM(Math.floor(Date.now()/1000) + 24*3600)}\nПричина: спам ссылками`,
           userId,
           userName
         );
@@ -264,6 +266,7 @@ serve(async (req: Request) => {
 
   return new Response("ok");
 });
+
 
 
 
