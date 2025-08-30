@@ -26,6 +26,7 @@ async function sendMuteMessage(chatId: number, text: string, userId: number, use
     body: JSON.stringify({
       chat_id: chatId,
       text,
+      parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [[
           { text: "🔓 Снять мут", callback_data: `remove_mute_${userId}_${encodeURIComponent(userName)}` }
@@ -146,14 +147,14 @@ serve(async (req: Request) => {
   if (update.message?.new_chat_member) {
     const user = update.message.new_chat_member;
     const chatId = update.message.chat.id;
-    await sendMessage(chatId, `Добро пожаловать, ${user.first_name}! 🎉`);
+    await sendMessage(chatId, `Добро пожаловать, [${user.first_name}](tg://user?id=${user.id})! 🎉`, true);
   }
 
   // --- Выход пользователя ---
   if (update.message?.left_chat_member) {
     const user = update.message.left_chat_member;
     const chatId = update.message.chat.id;
-    await sendMessage(chatId, `👋 ${user.first_name} покинул чат.`);
+    await sendMessage(chatId, `👋 [${user.first_name}](tg://user?id=${user.id}) покинул чат.`, true);
   }
 
   // --- Текстовые сообщения ---
@@ -166,25 +167,21 @@ serve(async (req: Request) => {
 
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
 
-    // --- /mute с несколькими интервалами и причиной (только reply от админа) ---
+    // --- /mute ---
     if (text.startsWith("/mute") && update.message.reply_to_message) {
       if (await isAdmin(chatId, userId)) {
         const targetUser = update.message.reply_to_message.from;
 
-        // Ищем все интервалы: /mute 1h 30m Flood
         const timeMatches = [...text.matchAll(/(\d+)([hm])/gi)];
         let seconds = 0;
-
         for (const match of timeMatches) {
           const value = parseInt(match[1]);
           const unit = match[2].toLowerCase();
           if (unit === "h") seconds += value * 3600;
           if (unit === "m") seconds += value * 60;
         }
+        if (seconds === 0) seconds = 24 * 3600;
 
-        if (seconds === 0) seconds = 24 * 3600; // по умолчанию 24ч
-
-        // Получаем причину (текст после интервалов)
         const reason = text.replace(/\/mute\s+([\dhm\s]+)/i, "").trim();
 
         await muteUser(chatId, targetUser.id, seconds);
@@ -193,14 +190,12 @@ serve(async (req: Request) => {
         const reasonText = reason ? `Причина: ${reason}` : "";
         await sendMuteMessage(
           chatId,
-          `🤐 ${targetUser.first_name} получил мут на ${durationText}. ${reasonText}`,
+          `🤐 [${targetUser.first_name}](tg://user?id=${targetUser.id}) получил мут на ${durationText}. ${reasonText}`,
           targetUser.id,
           targetUser.first_name
         );
 
-        // Удаляем команду
         await deleteMessage(chatId, messageId);
-
         return new Response("ok");
       } else return new Response("ok");
     }
@@ -219,7 +214,7 @@ serve(async (req: Request) => {
         await muteUser(chatId, userId);
         await sendMuteMessage(
           chatId,
-          `🤐 ${userName} получил мут на 24 часа за спам.`,
+          `🤐 [${userName}](tg://user?id=${userId}) получил мут на 24 часа за спам.`,
           userId,
           userName
         );
@@ -256,6 +251,7 @@ serve(async (req: Request) => {
 
   return new Response("ok");
 });
+
 
 
 
