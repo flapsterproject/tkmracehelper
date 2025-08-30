@@ -19,7 +19,7 @@ async function sendMessage(chatId: number, text: string, markdown = false) {
   });
 }
 
-async function sendMuteMessage(chatId: number, text: string, userId: number) {
+async function sendMuteMessage(chatId: number, text: string, userId: number, userName: string) {
   await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -28,7 +28,7 @@ async function sendMuteMessage(chatId: number, text: string, userId: number) {
       text,
       reply_markup: {
         inline_keyboard: [[
-          { text: "🔓 Снять мут", callback_data: `remove_mute_${userId}` }
+          { text: "🔓 Снять мут", callback_data: `remove_mute_${userId}_${encodeURIComponent(userName)}` }
         ]]
       }
     }),
@@ -194,7 +194,8 @@ serve(async (req: Request) => {
         await sendMuteMessage(
           chatId,
           `🤐 ${targetUser.first_name} получил мут на ${durationText}. ${reasonText}`,
-          targetUser.id
+          targetUser.id,
+          targetUser.first_name
         );
 
         // Удаляем команду
@@ -219,7 +220,8 @@ serve(async (req: Request) => {
         await sendMuteMessage(
           chatId,
           `🤐 ${userName} получил мут на 24 часа за спам.`,
-          userId
+          userId,
+          userName
         );
       }
     }
@@ -232,13 +234,12 @@ serve(async (req: Request) => {
     const data = update.callback_query.data;
 
     if (data.startsWith("remove_mute_")) {
-      const targetId = parseInt(data.replace("remove_mute_", ""));
+      const parts = data.split("_");
+      const targetId = parseInt(parts[2]);
+      const targetName = decodeURIComponent(parts.slice(3).join("_"));
+
       if (await isAdmin(chatId, fromId)) {
         await unmuteUser(chatId, targetId);
-
-        // Пишем с кликабельным именем
-        const targetUser = update.callback_query.message.reply_to_message?.from;
-        const targetName = targetUser?.first_name || "Пользователь";
 
         await sendMessage(
           chatId, 
@@ -255,6 +256,7 @@ serve(async (req: Request) => {
 
   return new Response("ok");
 });
+
 
 
 
