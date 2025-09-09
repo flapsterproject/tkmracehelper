@@ -5,12 +5,13 @@ const TOKEN = Deno.env.get("BOT_TOKEN")!;
 const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
 const SECRET_PATH = "/tkmracehelper";
 
-// Use usernames instead of IDs
-const SOURCE_CHANNEL = "@TkmRace";      // channel to copy from
-const TARGET_CHANNEL = "@MasakoffVpn";  // channel to send into
+// List of source channels (add more easily)
+const SOURCE_CHANNELS = ["@TkmRace", "@AnotherChannel"]; 
+// Target channel where all posts go
+const TARGET_CHANNEL = "@MasakoffVpn";
 
-// --- Copy message utility (no "forwarded from") ---
-async function copyMessage(fromChat: string, messageId: number, toChat: string) {
+// --- Copy message utility (adds footer) ---
+async function copyMessageWithFooter(fromChat: string, messageId: number, toChat: string, footer: string) {
   await fetch(`${TELEGRAM_API}/copyMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -18,6 +19,8 @@ async function copyMessage(fromChat: string, messageId: number, toChat: string) 
       chat_id: toChat,
       from_chat_id: fromChat,
       message_id: messageId,
+      caption: footer,  // footer will be added if original has no caption
+      parse_mode: "HTML"
     }),
   });
 }
@@ -33,13 +36,32 @@ serve(async (req: Request) => {
   // If it's a channel post
   if (update.channel_post) {
     const post = update.channel_post;
+    const channelUsername = `@${post.chat?.username}`;
 
-    // Only copy if it’s from @TkmRace
-    if (post.chat?.username?.toLowerCase() === SOURCE_CHANNEL.replace("@", "").toLowerCase()) {
-      await copyMessage(SOURCE_CHANNEL, post.message_id, TARGET_CHANNEL);
+    // If channel is in our source list
+    if (SOURCE_CHANNELS.some(c => c.toLowerCase() === channelUsername.toLowerCase())) {
+      const footer = `\n\n🔄 Powered by ${channelUsername}`;
+
+      // If post has text or caption → we must re-send with text+footer
+      if (post.text || post.caption) {
+        const text = (post.text ?? post.caption ?? "") + footer;
+        await fetch(`${TELEGRAM_API}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: TARGET_CHANNEL,
+            text,
+            parse_mode: "HTML"
+          }),
+        });
+      } else {
+        // If it's pure media (photo/video without caption) → copy with footer
+        await copyMessageWithFooter(channelUsername, post.message_id, TARGET_CHANNEL, footer);
+      }
     }
   }
 
   return new Response("ok");
 });
+
 
