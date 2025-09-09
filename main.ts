@@ -9,9 +9,9 @@ const SECRET_PATH = "/tkmracehelper";
 const SOURCE_CHANNEL = "@TkmRace";      // channel to copy from
 const TARGET_CHANNEL = "@MasakoffVpn";  // channel to send into
 
-// --- Forward message utility ---
-async function forwardMessage(fromChat: string, messageId: number, toChat: string) {
-  await fetch(`${TELEGRAM_API}/forwardMessage`, {
+// --- Copy message utility (no "forwarded from") ---
+async function copyMessage(fromChat: string, messageId: number, toChat: string) {
+  await fetch(`${TELEGRAM_API}/copyMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -34,11 +34,12 @@ serve(async (req: Request) => {
   if (update.channel_post) {
     const post = update.channel_post;
 
-    // Only forward if it’s from @TkmRace
+    // Only copy if it’s from @TkmRace
     if (post.chat?.username?.toLowerCase() === SOURCE_CHANNEL.replace("@", "").toLowerCase()) {
-      await forwardMessage(SOURCE_CHANNEL, post.message_id, TARGET_CHANNEL);
+      await copyMessage(SOURCE_CHANNEL, post.message_id, TARGET_CHANNEL);
     }
   }
 
   return new Response("ok");
 });
+
