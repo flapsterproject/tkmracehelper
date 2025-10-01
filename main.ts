@@ -4,23 +4,17 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 const TOKEN = Deno.env.get("BOT_TOKEN")!;
 const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
 const SECRET_PATH = "/tkmracehelper"; 
-const GAME_CHAT_ID = -1001234567890; // <-- ID oýun çat
+const GAME_CHAT_ID = -1001234567890; // <-- вставь ID твоего игрового чата
 
-// --- Avto-tekster ---
+// --- Авто-тексты для сообщений ---
 const autoTexts = [
-  "🏎 TkmRace-a hoş geldiň! Ýaryşa taýarmyň?",
-  "🔥 TkmRace-de diňe iň çaltlar çempion bolýar!",
-  "⚡ Reaksiýaňy ýokarlandyr — TkmRace-a gatnaş!",
-  "🎮 TkmRace seni garaşýar: tizlik, şowhun we adrenalin!",
-  "🚀 Raketa ýaly sür, öňe git!",
-  "💨 Tozany galdyr, garşydaşyň yzda galsyn!",
-  "🏁 Ýaryş başlaýar — taýarmyň?",
-  "⚡ Çalt pikir et, çalt hereket et!",
-  "🔥 Ýeňiş diňe güýçlülere degişlidir!",
-  "🏎 Çaltlyk bilen ýeňşi gazan!",
+  "🏎 Добро пожаловать в TkmRace! Готов к гонке?",
+  "🔥 В TkmRace только самые быстрые становятся чемпионами!",
+  "⚡ Улучши свою реакцию — участвуй в TkmRace прямо сейчас!",
+  "🎮 TkmRace ждёт тебя: скорость, драйв и адреналин!",
 ];
 
-// --- Utylity ---
+// --- Утилиты ---
 async function sendMessage(chatId: number, text: string, markdown = false, replyTo?: number) {
   const body: any = { chat_id: chatId, text };
   if (markdown) body.parse_mode = "Markdown";
@@ -43,7 +37,7 @@ async function sendMuteMessage(chatId: number, text: string, userId: number, use
       parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [[
-          { text: "🔓 Sessizligi aýyrmak", callback_data: `remove_mute_${userId}_${encodeURIComponent(userName)}` }
+          { text: "🔓 Снять мут", callback_data: `remove_mute_${userId}_${encodeURIComponent(userName)}` }
         ]]
       }
     }),
@@ -114,28 +108,25 @@ async function answerCallbackQuery(callbackQueryId: string, text: string, showAl
   });
 }
 
-// --- Formatlama ---
+// --- Форматирование времени ---
 function formatDuration(seconds: number): string {
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
+  const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
 
   let parts: string[] = [];
-  if (days > 0) {
-    parts.push(`${days} ${days === 1 ? "gün" : "gün"}`);
-  }
   if (hours > 0) {
-    parts.push(`${hours} ${hours === 1 ? "sagat" : "sagat"}`);
+    parts.push(`${hours} ${hours === 1 ? "час" : (hours < 5 ? "часа" : "часов")}`);
   }
   if (minutes > 0) {
-    parts.push(`${minutes} ${minutes === 1 ? "minut" : "minut"}`);
+    parts.push(`${minutes} ${minutes === 1 ? "минута" : (minutes < 5 ? "минуты" : "минут")}`);
   }
-  if (parts.length === 0) parts.push("birnäçe sekunt");
-  return parts.join(" ");
+
+  return parts.length > 0 ? parts.join(" ") : "несколько секунд";
 }
 
+// --- Форматируем дату по Туркменистану (UTC+5) ---
 function formatUntilDateTM(unixTime: number): string {
-  const d = new Date((unixTime + 5*3600) * 1000);
+  const d = new Date((unixTime + 5*3600) * 1000); // UTC+5
   const dd = d.getDate().toString().padStart(2, "0");
   const mm = (d.getMonth() + 1).toString().padStart(2, "0");
   const yyyy = d.getFullYear();
@@ -144,13 +135,13 @@ function formatUntilDateTM(unixTime: number): string {
   return `${dd}.${mm}.${yyyy} ${hh}:${min}`;
 }
 
-// --- Avto-habarlar ---
+// --- Авто-сообщения про игру ---
 setInterval(async () => {
   const randomText = autoTexts[Math.floor(Math.random() * autoTexts.length)];
   await sendMessage(GAME_CHAT_ID, randomText);
 }, 60 * 1000);
 
-// --- Server ---
+// --- Сервер ---
 serve(async (req: Request) => {
   if (new URL(req.url).pathname !== SECRET_PATH) {
     return new Response("Not Found", { status: 404 });
@@ -158,28 +149,28 @@ serve(async (req: Request) => {
 
   const update = await req.json();
 
-  // --- Private ---
+  // --- Личка ---
   if (update.message?.chat?.type === "private") {
     const chatId = update.message.chat.id;
-    await sendMessage(chatId, "👋 Salam! Men [TkmRace](https://t.me/TkmRaceChat) toparynyň boty. Men diňe oýunuň çatynda işlemäge ukybym bar.",true);
+    await sendMessage(chatId, "👋 Привет! Я бот группы TkmRace. Работать я могу только в чате игры.");
     return new Response("ok");
   }
 
-  // --- Täze ulanyjy ---
+  // --- Приветствие новых ---
   if (update.message?.new_chat_member) {
     const user = update.message.new_chat_member;
     const chatId = update.message.chat.id;
-    await sendMessage(chatId, `Hoş geldiň, [${user.first_name}](tg://user?id=${user.id})! 🎉`, true);
+    await sendMessage(chatId, `Добро пожаловать, [${user.first_name}](tg://user?id=${user.id})! 🎉`, true);
   }
 
-  // --- Ulanyjy çykan ýagdaýynda ---
+  // --- Выход пользователя ---
   if (update.message?.left_chat_member) {
     const user = update.message.left_chat_member;
     const chatId = update.message.chat.id;
-    await sendMessage(chatId, `👋 [${user.first_name}](tg://user?id=${user.id}) topardan çykdy.`, true);
+    await sendMessage(chatId, `👋 [${user.first_name}](tg://user?id=${user.id}) покинул чат.`, true);
   }
 
-  // --- Teskt habarlary ---
+  // --- Текстовые сообщения ---
   if (update.message?.text) {
     const chatId = update.message.chat.id;
     const userId = update.message.from.id;
@@ -189,74 +180,51 @@ serve(async (req: Request) => {
 
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
 
-    // --- Kanaldan habar ---
+    // --- Ответ на сообщения канала HedgehogChronicle ---
     if (update.message.sender_chat?.username === "TkmXO") {
       const randomText = autoTexts[Math.floor(Math.random() * autoTexts.length)];
       await sendMessage(chatId, randomText, false, messageId);
       return new Response("ok");
     }
 
-    // --- /mute komandasy (reply we @username) ---
-    if (text.startsWith("/mute")) {
-      let targetUser: any;
+    // --- /mute ---
+    if (text.startsWith("/mute") && update.message.reply_to_message) {
+      const targetUser = update.message.reply_to_message.from;
 
-      // --- Парсим время ---
-      const timeMatches = [...text.matchAll(/(\d+)([dhm])/gi)];
-      let seconds = 0;
-      for (const match of timeMatches) {
-        const value = parseInt(match[1]);
-        const unit = match[2].toLowerCase();
-        if (unit === "d") seconds += value * 86400;
-        if (unit === "h") seconds += value * 3600;
-        if (unit === "m") seconds += value * 60;
-      }
-      if (seconds === 0) seconds = 24 * 3600;
-
-      // --- Если reply ---
-      if (update.message.reply_to_message) {
-        targetUser = update.message.reply_to_message.from;
-      } else {
-        // --- По @username ---
-        const usernameMatch = text.match(/@(\w+)/);
-        if (usernameMatch) {
-          const username = usernameMatch[1];
-          try {
-            const res = await fetch(`${TELEGRAM_API}/getChatMember?chat_id=${chatId}&user_id=@${username}`);
-            const data = await res.json();
-            if (data.ok) targetUser = data.result.user;
-          } catch {
-            targetUser = null;
-          }
-        }
-      }
-
-      if (!targetUser) {
-        await deleteMessage(chatId, messageId);
-        return new Response("ok");
-      }
-
-      const reason = text.replace(/\/mute\s+(@\w+\s+)?([\ddhm\s]+)/i, "").trim();
-      const untilDate = Math.floor(Date.now() / 1000) + seconds;
-
-      // --- Проверка прав ---
+      // Если админ пытается замутить админа — просто удалить команду
       if (await isAdmin(chatId, userId) && await isAdmin(chatId, targetUser.id)) {
         await deleteMessage(chatId, messageId);
         return new Response("ok");
       }
+
+      // Если обычный пользователь пытается использовать /mute — удалить команду
       if (!(await isAdmin(chatId, userId))) {
         await deleteMessage(chatId, messageId);
         return new Response("ok");
       }
 
+      // --- Если всё корректно, мутим ---
+      const timeMatches = [...text.matchAll(/(\d+)([hm])/gi)];
+      let seconds = 0;
+      for (const match of timeMatches) {
+        const value = parseInt(match[1]);
+        const unit = match[2].toLowerCase();
+        if (unit === "h") seconds += value * 3600;
+        if (unit === "m") seconds += value * 60;
+      }
+      if (seconds === 0) seconds = 24 * 3600;
+
+      const reason = text.replace(/\/mute\s+([\dhm\s]+)/i, "").trim();
+      const untilDate = Math.floor(Date.now() / 1000) + seconds;
       await muteUser(chatId, targetUser.id, seconds);
 
       const durationText = formatDuration(seconds);
       const untilText = formatUntilDateTM(untilDate);
-      const reasonText = reason ? `Sebäp: ${reason}` : "";
+      const reasonText = reason ? `Причина: ${reason}` : "";
 
       await sendMuteMessage(
         chatId,
-        `🤐 [${targetUser.first_name}](tg://user?id=${targetUser.id}) ${durationText}lygyna sessizlige alyndy.\n⏳ ${untilText}-e çenli\n${reasonText}`,
+        `🤐 [${targetUser.first_name}](tg://user?id=${targetUser.id}) получил мут на ${durationText}.\n⏳ До ${untilText}\n${reasonText}`,
         targetUser.id,
         targetUser.first_name
       );
@@ -265,11 +233,11 @@ serve(async (req: Request) => {
       return new Response("ok");
     }
 
-    // --- Linkleri barlamak ---
+    // --- Проверка ссылок ---
     const links = (text.match(linkRegex) || []).map(l => l.trim());
     const whitelist = [
-      /^https?:\/\/t\.me\/TkmRace(\/.*)?(\?.*)?$/i,
-      /^https?:\/\/t\.me\/TkmRace(\/.*)?(\?.*)?$/i,
+      /^https?:\/\/t\.me\/Happ_VPN_official(\/.*)?(\?.*)?$/i,
+      /^https?:\/\/t\.me\/tmstars_chat(\/.*)?(\?.*)?$/i,
     ];
 
     if (links.length > 0) {
@@ -279,7 +247,7 @@ serve(async (req: Request) => {
         await muteUser(chatId, userId);
         await sendMuteMessage(
           chatId,
-          `🤐 [${userName}](tg://user?id=${userId}) 24 sagat sessize alyndy.\n⏳ ${formatUntilDateTM(Math.floor(Date.now()/1000) + 24*3600)}-e çenli\nSebäp: Spam sylkalar`,
+          `🤐 [${userName}](tg://user?id=${userId}) получил мут на 24 часа.\n⏳ До ${formatUntilDateTM(Math.floor(Date.now()/1000) + 24*3600)}\nПричина: спам ссылками`,
           userId,
           userName
         );
@@ -287,7 +255,7 @@ serve(async (req: Request) => {
     }
   }
 
-  // --- Inline knopka "sessizligi aýyrmak" ---
+  // --- Кнопка "Снять мут" ---
   if (update.callback_query) {
     const chatId = update.callback_query.message.chat.id;
     const fromId = update.callback_query.from.id;
@@ -300,13 +268,22 @@ serve(async (req: Request) => {
 
       if (await isAdmin(chatId, fromId)) {
         await unmuteUser(chatId, targetId);
-        await sendMessage(chatId, `🔓 [${targetName}](tg://user?id=${targetId}) sessizligiň administrator tarapyndan aýryldy.`, true);
-        await answerCallbackQuery(update.callback_query.id, "✅ Sessizlik aýryldy");
+
+        await sendMessage(
+          chatId, 
+          `🔓 Мут с [${targetName}](tg://user?id=${targetId}) снят админом.`,
+          true
+        );
+
+        await answerCallbackQuery(update.callback_query.id, "✅ Мут снят");
       } else {
-        await answerCallbackQuery(update.callback_query.id, "⛔ Diňe administrator sessizligi aýyryp biler", false);
+        await answerCallbackQuery(update.callback_query.id, "⛔ Только админ может снимать мут", false);
       }
     }
   }
 
   return new Response("ok");
 });
+
+
+
