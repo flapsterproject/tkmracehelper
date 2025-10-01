@@ -8,16 +8,16 @@ const GAME_CHAT_ID = -1001234567890; // <-- ID oýun çat
 
 // --- Avto-tekster ---
 const autoTexts = [
-  "❌⭕ TkmXO-a hoş geldiň! Oýna taýarmyň?",
-  "🔥 TkmXO-da diňe iň akyllylar çempion bolýar!",
-  "⚡ Strategiýaňy ýokarlandyr — TkmXO-a gatnaş!",
-  "🎮 TkmXO seni garaşýar: akyl, taktik we adrenalin!",
-  "🚀 XO ýaly oýna, öňe git!",
-  "💨 Garşydaşyňy ýeň, ýeňişi gazan!",
-  "🏁 Oýun başlaýar — taýarmyň?",
-  "⚡ Akylly pikir et, çalt hereket et!",
-  "🔥 Ýeňiş diňe akyllylara degişlidir!",
-  "❌⭕ Akyllyk bilen ýeňşi gazan!",
+  "🏎 TkmRace-a hoş geldiň! Ýaryşa taýarmyň?",
+  "🔥 TkmRace-de diňe iň çaltlar çempion bolýar!",
+  "⚡ Reaksiýaňy ýokarlandyr — TkmRace-a gatnaş!",
+  "🎮 TkmRace seni garaşýar: tizlik, şowhun we adrenalin!",
+  "🚀 Raketa ýaly sür, öňe git!",
+  "💨 Tozany galdyr, garşydaşyň yzda galsyn!",
+  "🏁 Ýaryş başlaýar — taýarmyň?",
+  "⚡ Çalt pikir et, çalt hereket et!",
+  "🔥 Ýeňiş diňe güýçlülere degişlidir!",
+  "🏎 Çaltlyk bilen ýeňşi gazan!",
 ];
 
 // --- Utylity ---
@@ -161,7 +161,7 @@ serve(async (req: Request) => {
   // --- Private ---
   if (update.message?.chat?.type === "private") {
     const chatId = update.message.chat.id;
-    await sendMessage(chatId, "👋 Salam! Men [TkmRace](https://t.me/TkmXOChat) toparynyň boty. Men diňe oýunuň çatynda işlemäge ukybym bar.",true);
+    await sendMessage(chatId, "👋 Salam! Men [TkmRace](https://t.me/TkmRaceChat) toparynyň boty. Men diňe oýunuň çatynda işlemäge ukybym bar.",true);
     return new Response("ok");
   }
 
@@ -310,6 +310,3 @@ serve(async (req: Request) => {
 
   return new Response("ok");
 });
-
-
-
