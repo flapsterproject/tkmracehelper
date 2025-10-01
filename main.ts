@@ -161,7 +161,7 @@ serve(async (req: Request) => {
   // --- Private ---
   if (update.message?.chat?.type === "private") {
     const chatId = update.message.chat.id;
-    await sendMessage(chatId, "👋 Salam! Men [TkmXO](https://t.me/TkmXOChat) toparynyň boty. Men diňe oýunuň çatynda işlemäge ukybym bar.",true);
+    await sendMessage(chatId, "👋 Salam! Men [TkmRace](https://t.me/TkmXOChat) toparynyň boty. Men diňe oýunuň çatynda işlemäge ukybym bar.",true);
     return new Response("ok");
   }
 
@@ -268,8 +268,8 @@ serve(async (req: Request) => {
     // --- Linkleri barlamak ---
     const links = (text.match(linkRegex) || []).map(l => l.trim());
     const whitelist = [
-      /^https?:\/\/t\.me\/TkmXO(\/.*)?(\?.*)?$/i,
-      /^https?:\/\/t\.me\/TkmXO(\/.*)?(\?.*)?$/i,
+      /^https?:\/\/t\.me\/TkmRace(\/.*)?(\?.*)?$/i,
+      /^https?:\/\/t\.me\/TkmRace(\/.*)?(\?.*)?$/i,
     ];
 
     if (links.length > 0) {
