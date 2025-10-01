@@ -3,12 +3,11 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 const TOKEN = Deno.env.get("BOT_TOKEN")!;
 const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
-const SECRET_PATH = "/tkmracehelper"; 
+const SECRET_PATH = "/tkmxohelper"; 
 const GAME_CHAT_ID = -1001234567890; // <-- ID oýun çat
 
 // --- Avto-tekster ---
 const autoTexts = [
-  "❌⭕ TkmXO-a hoş geldiň! Oýna taýarmyň?",
   "🔥 TkmXO-da diňe iň akyllylar çempion bolýar!",
   "⚡ Strategiýaňy ýokarlandyr — TkmXO-a gatnaş!",
   "🎮 TkmXO seni garaşýar: akyl, taktik we adrenalin!",
@@ -17,7 +16,6 @@ const autoTexts = [
   "🏁 Oýun başlaýar — taýarmyň?",
   "⚡ Akylly pikir et, çalt hereket et!",
   "🔥 Ýeňiş diňe akyllylara degişlidir!",
-  "❌⭕ Akyllyk bilen ýeňşi gazan!",
 ];
 
 // --- Utylity ---
@@ -161,7 +159,7 @@ serve(async (req: Request) => {
   // --- Private ---
   if (update.message?.chat?.type === "private") {
     const chatId = update.message.chat.id;
-    await sendMessage(chatId, "👋 Salam! Men [TkmRace](https://t.me/TkmXOChat) toparynyň boty. Men diňe oýunuň çatynda işlemäge ukybym bar.",true);
+    await sendMessage(chatId, "👋 Salam! Men [TkmXO](https://t.me/TkmXOChat) toparynyň boty. Men diňe oýunuň çatynda işlemäge ukybym bar.",true);
     return new Response("ok");
   }
 
